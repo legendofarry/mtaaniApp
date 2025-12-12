@@ -1,0 +1,721 @@
+// /src/auth/Onboarding.js
+import React, { useState, useEffect, useRef } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableOpacity,
+  ScrollView,
+  Image,
+  Alert,
+  ActivityIndicator,
+  Dimensions,
+} from "react-native";
+import { useTheme } from "../common/ThemeProvider";
+import AnimatedBackground from "../common/AnimatedBackground";
+import { Button } from "../common/Button";
+import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
+import { Camera } from "expo-camera";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { API_URL, headers } from "../services/api";
+
+const SCREEN_WIDTH = Dimensions.get("window").width;
+
+export default function Onboarding({ route, navigation }) {
+  // expected route.params: { userId, token }
+  const { userId, token: routeToken } = route.params || {};
+  const { theme } = useTheme();
+
+  // profile fields
+  const [phone, setPhone] = useState("");
+  const [gender, setGender] = useState("other"); // male|female|other
+  const [age, setAge] = useState("");
+  const [location, setLocation] = useState({
+    area: "",
+    estate: "",
+    apartmentName: "",
+    plotNumber: "",
+    block: "",
+    floor: "",
+    houseNumber: "",
+    landmark: "",
+    gps: { lat: null, lng: null },
+  });
+
+  // avatar state
+  const [avatarLocalUri, setAvatarLocalUri] = useState(null); // local uri
+  const [avatarBase64, setAvatarBase64] = useState(null); // optional base64
+  const [uploading, setUploading] = useState(false);
+
+  // camera state
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const cameraRef = useRef(null);
+  const [hasCameraPermission, setHasCameraPermission] = useState(null);
+  const [flash, setFlash] = useState(Camera.Constants.FlashMode.off);
+
+  // get token: route token or AsyncStorage fallback
+  const [token, setToken] = useState(routeToken || null);
+  useEffect(() => {
+    if (!token) {
+      (async () => {
+        const t = await AsyncStorage.getItem("token");
+        if (t) setToken(t);
+      })();
+    }
+  }, []);
+
+  // request camera permissions on mount
+  useEffect(() => {
+    (async () => {
+      const { status } = await Camera.requestCameraPermissionsAsync();
+      setHasCameraPermission(status === "granted");
+    })();
+  }, []);
+
+  // helper: open image gallery
+  const pickImageFromGallery = async () => {
+    try {
+      const res = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (res.status !== "granted") {
+        Alert.alert(
+          "Permission required",
+          "Allow gallery access to choose a photo."
+        );
+        return;
+      }
+      const pick = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.8,
+        base64: true,
+      });
+      if (!pick.cancelled) {
+        setAvatarLocalUri(pick.uri);
+        setAvatarBase64(
+          pick.base64 ? `data:image/jpeg;base64,${pick.base64}` : null
+        );
+      }
+    } catch (err) {
+      console.log("Gallery error", err);
+      Alert.alert("Error", "Could not pick image. Try again.");
+    }
+  };
+
+  // helper: open camera capture
+  const openCamera = () => {
+    if (hasCameraPermission === false) {
+      Alert.alert(
+        "Camera permission",
+        "Camera permission is required to take a selfie."
+      );
+      return;
+    }
+    setCameraOpen(true);
+  };
+
+  // capture photo (camera UI is an inline simple capture)
+  const capturePhoto = async () => {
+    try {
+      if (!cameraRef.current) return;
+      const photo = await cameraRef.current.takePictureAsync({
+        quality: 0.8,
+        base64: true,
+      });
+      setAvatarLocalUri(photo.uri);
+      setAvatarBase64(
+        photo.base64 ? `data:image/jpeg;base64,${photo.base64}` : null
+      );
+      setCameraOpen(false);
+    } catch (err) {
+      console.log("Capture error", err);
+      Alert.alert("Error", "Failed to take photo. Try again.");
+    }
+  };
+
+  // GPS fetching helper (uses expo-location if you add it; fallback omitted)
+  const fetchGPS = async () => {
+    try {
+      const { status } = await (
+        await import("expo-location")
+      ).requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Location required", "Allow location to auto-fill GPS.");
+        return;
+      }
+      const pos = await (
+        await import("expo-location")
+      ).getCurrentPositionAsync({
+        accuracy: (await import("expo-location")).Accuracy.Highest,
+      });
+      setLocation((p) => ({
+        ...p,
+        gps: { lat: pos.coords.latitude, lng: pos.coords.longitude },
+      }));
+    } catch (err) {
+      console.log("GPS error", err);
+      Alert.alert("Error", "Could not get GPS. Try again.");
+    }
+  };
+
+  // determine default avatar asset (local) based on gender
+  const getDefaultAvatar = () => {
+    if (gender === "male") return require("../../assets/avatars/male.png");
+    if (gender === "female") return require("../../assets/avatars/female.png");
+    // other: choose a neutral default (female used as fallback if you supply only two)
+    return require("../../assets/avatars/female.png");
+  };
+
+  // Validate required fields before submit
+  const validate = () => {
+    if (!phone || phone.length < 7) {
+      Alert.alert("Enter phone", "Please enter a valid phone number.");
+      return false;
+    }
+    if (!location.area || location.area.trim().length < 2) {
+      Alert.alert("Enter area", "Please enter your area (neighborhood).");
+      return false;
+    }
+    if (!age || isNaN(parseInt(age, 10)) || parseInt(age, 10) < 10) {
+      Alert.alert("Enter age", "Please enter a valid age.");
+      return false;
+    }
+    return true;
+  };
+
+  // upload / save profile
+  const handleSaveProfile = async () => {
+    if (!validate()) return;
+    setUploading(true);
+
+    try {
+      // Prepare URL and headers
+      const url = `${API_URL}/users/${userId}`;
+      const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+
+      // If we have a local avatar file, try sending multipart/form-data
+      if (avatarLocalUri) {
+        // Build form data
+        const form = new FormData();
+        form.append("phone", phone);
+        form.append("gender", gender);
+        form.append("age", `${age}`);
+        form.append("location", JSON.stringify(location));
+
+        // On React Native, file needs name & type
+        const filename = avatarLocalUri.split("/").pop();
+        const match = /\.(\w+)$/.exec(filename || "");
+        const filetype = match ? `image/${match[1]}` : "image/jpeg";
+
+        // For Expo-managed apps, fetch the file to get blob (RN can handle direct uri in FormData too)
+        let fileToUpload;
+        try {
+          const response = await fetch(avatarLocalUri);
+          const blob = await response.blob();
+          fileToUpload = {
+            uri: avatarLocalUri,
+            name: filename || `avatar.${match ? match[1] : "jpg"}`,
+            type: filetype,
+            // some servers want the blob itself appended, but FormData works with { uri, name, type }
+          };
+          form.append("avatar", fileToUpload);
+        } catch (err) {
+          console.log("Form file fetch failed", err);
+          // fallback: append base64 string
+          if (avatarBase64) {
+            form.append("avatarBase64", avatarBase64);
+          }
+        }
+
+        // Send multipart
+        const res = await fetch(url, {
+          method: "PUT",
+          headers: {
+            // leave out Content-Type to let fetch set the correct boundary
+            ...authHeaders,
+            Accept: "application/json",
+          },
+          body: form,
+        });
+
+        const resJson = await res.json();
+        setUploading(false);
+
+        if (!res.ok) {
+          console.log("Save profile (form) failed", resJson);
+          Alert.alert("Failed", resJson.message || "Could not save profile.");
+          return;
+        }
+
+        // success
+        await AsyncStorage.setItem("user", JSON.stringify(resJson.user || {}));
+        // navigate to home
+        navigation.reset &&
+          navigation.reset({ index: 0, routes: [{ name: "HomeTabs" }] });
+        return;
+      }
+
+      // If no local avatar selected, use default local asset (we will not upload it)
+      // Instead send a field telling backend to set default avatar based on gender.
+      const payload = {
+        phone,
+        gender,
+        age: parseInt(age, 10),
+        location,
+        useDefaultAvatar: true,
+        defaultAvatarGender:
+          gender === "male"
+            ? "male"
+            : gender === "female"
+            ? "female"
+            : "neutral",
+      };
+
+      const res2 = await fetch(url, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(authHeaders || {}),
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const json2 = await res2.json();
+      setUploading(false);
+
+      if (!res2.ok) {
+        console.log("Save profile (json) failed", json2);
+        Alert.alert("Failed", json2.message || "Could not save profile.");
+        return;
+      }
+
+      // success
+      await AsyncStorage.setItem("user", JSON.stringify(json2.user || {}));
+      navigation.reset &&
+        navigation.reset({
+          index: 0,
+          routes: [{ name: "Tabs", params: { transition: "fade" } }],
+        });
+    } catch (err) {
+      setUploading(false);
+      console.log("Save profile error", err);
+      Alert.alert("Network error", "Could not save profile. Try again.");
+    }
+  };
+
+  // UI
+  return (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      style={{ flex: 1, backgroundColor: theme.colors.background }}
+    >
+      <AnimatedBackground small />
+
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+          <Text style={[styles.header, { color: theme.colors.textPrimary }]}>
+            Complete your profile
+          </Text>
+
+          <Text style={[styles.hint, { color: theme.colors.textSecondary }]}>
+            Tell us a bit more to personalize your experience. Choosing Male or
+            Female helps us pick a default avatar — if you prefer not to say,
+            choose Other.
+          </Text>
+
+          {/* Selfie / Avatar */}
+          <View style={styles.avatarRow}>
+            <View style={styles.avatarPreview}>
+              {avatarLocalUri ? (
+                <Image
+                  source={{ uri: avatarLocalUri }}
+                  style={styles.avatarImage}
+                />
+              ) : (
+                <Image source={getDefaultAvatar()} style={styles.avatarImage} />
+              )}
+            </View>
+
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Button title="Take selfie" onPress={openCamera} />
+              <View style={{ height: 10 }} />
+              <Button
+                title="Choose from gallery"
+                variant="secondary"
+                onPress={pickImageFromGallery}
+              />
+              <View style={{ height: 8 }} />
+              <TouchableOpacity
+                onPress={() => {
+                  setAvatarLocalUri(null);
+                  setAvatarBase64(null);
+                  Alert.alert(
+                    "Skipped",
+                    "You can change avatar later in profile settings."
+                  );
+                }}
+              >
+                <Text
+                  style={{ color: theme.colors.textSecondary, marginTop: 8 }}
+                >
+                  Skip
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Camera inline modal-ish view */}
+          {cameraOpen && hasCameraPermission && (
+            <View style={styles.cameraContainer}>
+              <Camera
+                style={styles.cameraPreview}
+                type={Camera.Constants.Type.front}
+                flashMode={flash}
+                ref={cameraRef}
+              >
+                <View style={styles.cameraTop}>
+                  <TouchableOpacity
+                    onPress={() =>
+                      setFlash((f) =>
+                        f === Camera.Constants.FlashMode.off
+                          ? Camera.Constants.FlashMode.torch
+                          : Camera.Constants.FlashMode.off
+                      )
+                    }
+                  >
+                    <Ionicons name="flash" size={28} color="#fff" />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => setCameraOpen(false)}>
+                    <Ionicons name="close" size={28} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.cameraBottom}>
+                  <TouchableOpacity
+                    onPress={capturePhoto}
+                    style={styles.captureButton}
+                  >
+                    <View style={styles.captureInner} />
+                  </TouchableOpacity>
+                </View>
+              </Camera>
+            </View>
+          )}
+
+          {/* Phone */}
+          <Text style={[styles.label, { color: theme.colors.textSecondary }]}>
+            Phone
+          </Text>
+          <View style={styles.inputRow}>
+            <Ionicons
+              name="call-outline"
+              size={20}
+              color={theme.colors.textSecondary}
+            />
+            <TextInput
+              placeholder="Phone number"
+              placeholderTextColor={theme.colors.textDisabled}
+              style={[styles.input, { color: theme.colors.textPrimary }]}
+              keyboardType="phone-pad"
+              value={phone}
+              onChangeText={setPhone}
+            />
+          </View>
+
+          {/* Gender */}
+          <Text style={[styles.label, { color: theme.colors.textSecondary }]}>
+            Gender
+          </Text>
+          <View style={styles.genderRow}>
+            <TouchableOpacity
+              style={[
+                styles.genderBtn,
+                gender === "male" && styles.genderBtnActive,
+              ]}
+              onPress={() => setGender("male")}
+            >
+              <Text
+                style={[
+                  styles.genderText,
+                  gender === "male" && styles.genderTextActive,
+                ]}
+              >
+                Male
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.genderBtn,
+                gender === "female" && styles.genderBtnActive,
+              ]}
+              onPress={() => setGender("female")}
+            >
+              <Text
+                style={[
+                  styles.genderText,
+                  gender === "female" && styles.genderTextActive,
+                ]}
+              >
+                Female
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.genderBtn,
+                gender === "other" && styles.genderBtnActive,
+              ]}
+              onPress={() => setGender("other")}
+            >
+              <Text
+                style={[
+                  styles.genderText,
+                  gender === "other" && styles.genderTextActive,
+                ]}
+              >
+                Other / Prefer not to say
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Age */}
+          <Text style={[styles.label, { color: theme.colors.textSecondary }]}>
+            Age
+          </Text>
+          <View style={styles.inputRow}>
+            <Ionicons
+              name="calendar-outline"
+              size={20}
+              color={theme.colors.textSecondary}
+            />
+            <TextInput
+              placeholder="Age"
+              placeholderTextColor={theme.colors.textDisabled}
+              style={[styles.input, { color: theme.colors.textPrimary }]}
+              keyboardType="number-pad"
+              value={age}
+              onChangeText={setAge}
+            />
+          </View>
+
+          {/* Location area (required) */}
+          <Text style={[styles.label, { color: theme.colors.textSecondary }]}>
+            Area (neighbourhood)
+          </Text>
+          <View style={styles.inputRow}>
+            <Ionicons
+              name="location-outline"
+              size={20}
+              color={theme.colors.textSecondary}
+            />
+            <TextInput
+              placeholder="Area (e.g., Kayole Soweto)"
+              placeholderTextColor={theme.colors.textDisabled}
+              style={[styles.input, { color: theme.colors.textPrimary }]}
+              value={location.area}
+              onChangeText={(t) => setLocation((p) => ({ ...p, area: t }))}
+            />
+          </View>
+
+          {/* Optional address details */}
+          <Text style={[styles.label, { color: theme.colors.textSecondary }]}>
+            Estate / Apartment (optional)
+          </Text>
+          <View style={styles.inputRow}>
+            <Ionicons
+              name="home-outline"
+              size={20}
+              color={theme.colors.textSecondary}
+            />
+            <TextInput
+              placeholder="Estate or apartment name"
+              placeholderTextColor={theme.colors.textDisabled}
+              style={[styles.input, { color: theme.colors.textPrimary }]}
+              value={location.estate}
+              onChangeText={(t) => setLocation((p) => ({ ...p, estate: t }))}
+            />
+          </View>
+
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Text
+                style={[styles.label, { color: theme.colors.textSecondary }]}
+              >
+                Block
+              </Text>
+              <View style={styles.inputRow}>
+                <TextInput
+                  placeholder="Block"
+                  placeholderTextColor={theme.colors.textDisabled}
+                  style={[styles.input, { color: theme.colors.textPrimary }]}
+                  value={location.block}
+                  onChangeText={(t) => setLocation((p) => ({ ...p, block: t }))}
+                />
+              </View>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text
+                style={[styles.label, { color: theme.colors.textSecondary }]}
+              >
+                House / Apt No
+              </Text>
+              <View style={styles.inputRow}>
+                <TextInput
+                  placeholder="House/Apt No"
+                  placeholderTextColor={theme.colors.textDisabled}
+                  style={[styles.input, { color: theme.colors.textPrimary }]}
+                  value={location.houseNumber}
+                  onChangeText={(t) =>
+                    setLocation((p) => ({ ...p, houseNumber: t }))
+                  }
+                />
+              </View>
+            </View>
+          </View>
+
+          <Text style={[styles.label, { color: theme.colors.textSecondary }]}>
+            Landmark (optional)
+          </Text>
+          <View style={styles.inputRow}>
+            <Ionicons
+              name="map-outline"
+              size={20}
+              color={theme.colors.textSecondary}
+            />
+            <TextInput
+              placeholder="Landmark"
+              placeholderTextColor={theme.colors.textDisabled}
+              style={[styles.input, { color: theme.colors.textPrimary }]}
+              value={location.landmark}
+              onChangeText={(t) => setLocation((p) => ({ ...p, landmark: t }))}
+            />
+          </View>
+
+          <TouchableOpacity onPress={fetchGPS} style={{ marginTop: 8 }}>
+            <Text style={{ color: theme.colors.primary }}>Use current GPS</Text>
+          </TouchableOpacity>
+
+          <View style={{ height: 14 }} />
+
+          {uploading ? (
+            <View style={{ alignItems: "center" }}>
+              <ActivityIndicator size="large" color={theme.colors.primary} />
+              <Text
+                style={{ marginTop: 10, color: theme.colors.textSecondary }}
+              >
+                Saving profile...
+              </Text>
+            </View>
+          ) : (
+            <Button title="Finish & Go to Home" onPress={handleSaveProfile} />
+          )}
+
+          <View style={{ height: 28 }} />
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { paddingVertical: 24, flexGrow: 1 },
+  card: {
+    marginHorizontal: 16,
+    padding: 18,
+    borderRadius: 18,
+  },
+
+  header: { fontSize: 24, fontWeight: "700", marginBottom: 8 },
+  hint: { fontSize: 13, marginBottom: 12 },
+
+  avatarRow: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
+  avatarPreview: {
+    width: 110,
+    height: 110,
+    borderRadius: 110 / 2,
+    overflow: "hidden",
+    backgroundColor: "#F3F4F6",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  avatarImage: { width: "100%", height: "100%" },
+
+  label: { marginTop: 8, marginBottom: 6, fontWeight: "600" },
+
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    marginBottom: 12,
+    backgroundColor: "#fff",
+    borderColor: "#E6E6E6",
+    gap: 10,
+  },
+
+  input: { flex: 1, fontSize: 16 },
+
+  genderRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 12,
+    flexWrap: "wrap",
+  },
+  genderBtn: {
+    borderWidth: 1,
+    borderColor: "#E6E6E6",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: "#fff",
+  },
+  genderBtnActive: { borderColor: "#0B68FF", backgroundColor: "#EAF2FF" },
+  genderText: { fontSize: 14 },
+  genderTextActive: { color: "#0B68FF", fontWeight: "700" },
+
+  cameraContainer: {
+    marginVertical: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+    height: 360,
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  cameraPreview: { width: "100%", height: "100%" },
+  cameraTop: {
+    marginTop: 12,
+    marginHorizontal: 12,
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  cameraBottom: {
+    flex: 1,
+    justifyContent: "flex-end",
+    paddingBottom: 18,
+    alignItems: "center",
+  },
+  captureButton: {
+    width: 78,
+    height: 78,
+    borderRadius: 78 / 2,
+    borderWidth: 6,
+    borderColor: "rgba(255,255,255,0.9)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  captureInner: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: "#fff",
+  },
+});

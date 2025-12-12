@@ -191,7 +191,12 @@ exports.verifyOtp = async (req, res) => {
     success: true,
     message: "OTP verified",
     accessToken: token,
-    user: { id: user._id, email: user.email },
+    userId: user._id.toString(), // ⭐ Add userId at root level
+    user: {
+      id: user._id.toString(),
+      email: user.email,
+      onboardingCompleted: user.onboardingCompleted || false,
+    },
   });
 };
 

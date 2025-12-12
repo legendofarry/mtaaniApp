@@ -93,7 +93,7 @@ export default function Onboarding({ route, navigation }) {
         return;
       }
       const pick = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ["images"], // ⭐ Fixed deprecation
         quality: 0.8,
         base64: true,
       });
@@ -179,6 +179,11 @@ export default function Onboarding({ route, navigation }) {
 
   // Validate required fields
   const validate = () => {
+    console.log("🔍 Validating fields...");
+    console.log("Phone:", phone);
+    console.log("Area:", location.area);
+    console.log("Age:", age);
+
     if (!phone || phone.length < 7) {
       Alert.alert("Enter phone", "Please enter a valid phone number.");
       return false;
@@ -191,11 +196,16 @@ export default function Onboarding({ route, navigation }) {
       Alert.alert("Enter age", "Please enter a valid age.");
       return false;
     }
+    console.log("✅ Validation passed!");
     return true;
   };
 
   // upload / save profile
   const handleSaveProfile = async () => {
+    console.log("🚀 Save profile clicked!");
+    console.log("UserId:", userId);
+    console.log("Token:", token);
+
     if (!validate()) return;
     setUploading(true);
 
@@ -210,6 +220,7 @@ export default function Onboarding({ route, navigation }) {
         form.append("gender", gender);
         form.append("age", `${age}`);
         form.append("location", JSON.stringify(location));
+        form.append("onboardingCompleted", "true"); // ⭐ Mark as completed
 
         const filename = avatarLocalUri.split("/").pop();
         const match = /\.(\w+)$/.exec(filename || "");
@@ -262,6 +273,7 @@ export default function Onboarding({ route, navigation }) {
         gender,
         age: parseInt(age, 10),
         location,
+        onboardingCompleted: true, // ⭐ Mark as completed
         useDefaultAvatar: true,
         defaultAvatarGender:
           gender === "male"
@@ -614,7 +626,24 @@ export default function Onboarding({ route, navigation }) {
               </Text>
             </View>
           ) : (
-            <Button title="Finish & Go to Home" onPress={handleSaveProfile} />
+            <>
+              <TouchableOpacity
+                onPress={() => console.log("TEST: Button was pressed!")}
+                style={{
+                  padding: 10,
+                  backgroundColor: "red",
+                  marginBottom: 10,
+                }}
+              >
+                <Text style={{ color: "white" }}>TEST BUTTON (DELETE ME)</Text>
+              </TouchableOpacity>
+
+              <Button
+                title="Finish & Go to Home"
+                onPress={handleSaveProfile}
+                disabled={uploading}
+              />
+            </>
           )}
 
           <View style={{ height: 28 }} />

@@ -63,45 +63,49 @@ exports.register = async (req, res) => {
       verified: false,
     });
 
-    // Save user first. If this fails, we must return error.
+    // Save user first
     await user.save();
+    logger.info(`User created: ${user._id}`);
 
-    // Generate OTP + save + optionally send mail.
-    // Important: wrap in try/catch so OTP/mail failures don't convert into a 500
-    // after we've successfully created the user.
-    let otp;
+    // Generate OTP
+    let otpCode = null;
     try {
-      otp = generateOTP(6);
-      // saveOtp should handle persistence of OTP (in your Otp model or similar)
-      await saveOtp(emailNormalized, otp, "verify", 10 * 60);
+      otpCode = generateOTP(6);
+      await saveOtp(emailNormalized, otpCode, "verify", 10 * 60);
+      logger.info(`OTP generated for ${emailNormalized}: ${otpCode}`);
 
-      // Optionally send mail inside saveOtp or separately; if saveOtp
-      // doesn't send email, you might want to send it here. But we will
-      // not throw on mail failures (we log and continue).
-      // If you have transporter usage inside saveOtp, this catch will handle it.
+      // Send email (skip in dev mode if you want)
+      if (!devIsEnabled()) {
+        const mail = {
+          from: process.env.EMAIL_FROM,
+          to: emailNormalized,
+          subject: "Your MtaaniFlow verification code",
+          html: `<p>Your verification code is <strong>${otpCode}</strong></p>`,
+        };
+        await transporter.sendMail(mail);
+        logger.info(`OTP email sent to ${emailNormalized}`);
+      }
     } catch (otpErr) {
-      // Log OTP save / mail error but continue — user is already created.
-      logger.warn(
-        "OTP creation/send failed after creating user:",
-        otpErr.message || otpErr
-      );
+      logger.error("OTP creation/send failed:", otpErr.message || otpErr);
+      // Continue - user is created, they can request OTP again
     }
 
-    // Successful creation response — return dev OTP only in non-production.
+    // Build response
     const response = {
       success: true,
       message: devIsEnabled()
-        ? "Account created (dev mode). OTP returned if generated"
-        : "Account created",
+        ? "Account created (dev mode). Check console for OTP"
+        : "Account created. Check your email for verification code.",
       userId: user._id,
     };
-    if (devIsEnabled() && otp) {
-      response.otp = otp;
+
+    // Return OTP in dev mode
+    if (devIsEnabled() && otpCode) {
+      response.otp = otpCode;
     }
 
     return res.status(201).json(response);
   } catch (err) {
-    // If user.save() or other earlier steps failed we'll reach here.
     logger.error("Register error:", err.message || err);
     return res
       .status(500)
@@ -125,7 +129,6 @@ exports.requestOtp = async (req, res) => {
     await saveOtp(emailNormalized, otp, purpose, 10 * 60);
   } catch (err) {
     logger.warn("Failed to save OTP:", err.message || err);
-    // continue — we will still attempt to send dev response in dev mode
   }
 
   const mail = {

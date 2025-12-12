@@ -208,7 +208,12 @@ export default function Register({ navigation }) {
 
             {/* Error */}
             {error ? (
-              <Text style={[styles.error, { color: theme.colors.error }]}>
+              <Text
+                style={[
+                  styles.error,
+                  { color: theme.colors.error, fontWeight: "bold" },
+                ]}
+              >
                 {error}
               </Text>
             ) : (

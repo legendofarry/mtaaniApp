@@ -1,143 +1,42 @@
-// src\appScreens\Routes.js
-import React, { useEffect, useState } from "react";
+import React from "react";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
+
 import AuthStack from "./navigation/AuthStack";
 import MainStack from "./navigation/MainStack";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import SplashScreen from "./navigation/SplashScreen";
-import SplashAfterLogin from "./navigation/SplashAfterLogin";
-import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import Onboarding from "../auth/Onboarding";
-import { API_URL, headers } from "../services/api";
+
+import { useAuth } from "../store/useAuth";
 
 const Stack = createNativeStackNavigator();
 
 export default function Routes() {
-  const [loading, setLoading] = useState(true);
-  const [loggedIn, setLoggedIn] = useState(false);
-  const [needsOnboarding, setNeedsOnboarding] = useState(false);
-  const [showOnboardingSplash, setShowOnboardingSplash] = useState(false);
-  const [userId, setUserId] = useState(null);
-  const [token, setToken] = useState(null);
+  const { token, user, isRestored } = useAuth();
 
-  useEffect(() => {
-    checkAuthAndOnboarding();
-  }, []);
-
-  const checkAuthAndOnboarding = async () => {
-    try {
-      // ⭐ Check if onboarding just completed
-      const justCompleted = await AsyncStorage.getItem(
-        "onboardingJustCompleted"
-      );
-      if (justCompleted === "true") {
-        await AsyncStorage.removeItem("onboardingJustCompleted");
-        setShowOnboardingSplash(true);
-        setLoggedIn(true);
-        setNeedsOnboarding(false);
-        setLoading(false);
-        return;
-      }
-
-      const storedToken = await AsyncStorage.getItem("token");
-      const storedUser = await AsyncStorage.getItem("user");
-
-      if (!storedToken) {
-        // Not logged in
-        setLoggedIn(false);
-        setLoading(false);
-        return;
-      }
-
-      // User is logged in
-      setLoggedIn(true);
-      setToken(storedToken);
-
-      // Parse user data
-      let user = null;
-      try {
-        user = storedUser ? JSON.parse(storedUser) : null;
-      } catch (e) {
-        console.log("Error parsing user:", e);
-      }
-
-      // Check if we need to fetch fresh user data from backend
-      if (!user || !user.id) {
-        console.log("No user data in storage, fetching from backend...");
-        const freshUser = await fetchUserFromBackend(storedToken);
-        if (freshUser) {
-          user = freshUser;
-          await AsyncStorage.setItem("user", JSON.stringify(freshUser));
-        }
-      }
-
-      // Check onboarding status
-      if (user) {
-        setUserId(user.id);
-        const onboarded = user.onboardingCompleted === true;
-
-        if (!onboarded) {
-          console.log("⚠️ User needs onboarding");
-          setNeedsOnboarding(true);
-        } else {
-          console.log("✅ User onboarding complete");
-          setNeedsOnboarding(false);
-        }
-      }
-
-      setLoading(false);
-    } catch (err) {
-      console.error("Auth check error:", err);
-      setLoggedIn(false);
-      setLoading(false);
-    }
-  };
-
-  const fetchUserFromBackend = async (authToken) => {
-    try {
-      const res = await fetch(`${API_URL}/users/me`, {
-        method: "GET",
-        headers: headers(authToken),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        return data.user || data;
-      }
-      return null;
-    } catch (err) {
-      console.error("Error fetching user:", err);
-      return null;
-    }
-  };
-
-  if (loading) {
+  // Still restoring storage
+  if (!isRestored) {
     return <SplashScreen />;
   }
 
-  // ⭐ Show splash after onboarding completion
-  if (showOnboardingSplash) {
-    return <SplashAfterLogin />;
-  }
-
-  // Not logged in → show auth screens
-  if (!loggedIn) {
+  // Not logged in
+  if (!token) {
     return <AuthStack />;
   }
 
-  // Logged in but needs onboarding → force onboarding
-  if (needsOnboarding) {
+  // Logged in but not onboarded
+  if (user && user.onboardingCompleted !== true) {
+    console.log("Not onboarded", user.onboardingCompleted);
     return (
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen
           name="Onboarding"
           component={Onboarding}
-          initialParams={{ userId, token }}
-          options={{ gestureEnabled: false }} // Prevent back swipe
+          options={{ gestureEnabled: false }}
         />
       </Stack.Navigator>
     );
   }
 
-  // Fully authenticated and onboarded → show main app
+  // Logged in + onboarded
   return <MainStack />;
 }

@@ -1,15 +1,19 @@
-// src/appScreens/App.js
-import React from "react";
+import React, { useEffect } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import Routes from "./Routes";
 import { ThemeProvider } from "../common/ThemeProvider";
-import { UserProvider } from "../context/UserContext"; // ⭐ Added
+import { UserProvider } from "../context/UserContext";
+import { useAuth } from "../store/useAuth";
 
 export default function App() {
+  const restoreAuth = useAuth((state) => state.restoreAuth);
+
+  useEffect(() => {
+    restoreAuth(); // 🔥 restore token + user ONCE
+  }, []);
+
   return (
     <UserProvider>
-      {" "}
-      {/* ⭐ Wrap whole app for global user state */}
       <ThemeProvider>
         <NavigationContainer>
           <Routes />

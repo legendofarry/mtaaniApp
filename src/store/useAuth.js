@@ -1,76 +1,51 @@
-// src/store/useAuth.js
 import { create } from "zustand";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { API_URL, headers } from "../services/api";
 
-export const useAuth = create((set, get) => ({
+export const useAuth = create((set) => ({
   user: null,
   token: null,
-  isRestored: false, // prevents UI flicker before loading storage
+  isRestored: false,
 
-  // -----------------------------------
-  // Save user + token after login
-  // -----------------------------------
-  login: async ({ user, token }) => {
-    await AsyncStorage.setItem("token", token);
-    await AsyncStorage.setItem("userProfile", JSON.stringify(user));
-
-    set({ user, token });
-  },
-
-  // -----------------------------------
-  // Update stored user profile anywhere
-  // -----------------------------------
-  setUser: async (updatedUser) => {
-    await AsyncStorage.setItem("userProfile", JSON.stringify(updatedUser));
-    set({ user: updatedUser });
-  },
-
-  // -----------------------------------
-  // Restore session on app load
-  // -----------------------------------
   restoreAuth: async () => {
     try {
-      const storedToken = await AsyncStorage.getItem("token");
-      const storedUser = await AsyncStorage.getItem("userProfile");
+      const token = await AsyncStorage.getItem("token");
+      const user = await AsyncStorage.getItem("user");
 
-      if (storedToken && storedUser) {
+      if (token && user) {
         set({
-          token: storedToken,
-          user: JSON.parse(storedUser),
+          token,
+          user: JSON.parse(user),
           isRestored: true,
         });
       } else {
         set({ isRestored: true });
       }
-    } catch (err) {
-      console.log("Auth restore error:", err);
+    } catch {
       set({ isRestored: true });
     }
   },
 
-  // -----------------------------------
-  // Logout for simple flows (NOT full reset)
-  // -----------------------------------
-  logoutAndReset: async () => {
-    await AsyncStorage.removeItem("token");
-    await AsyncStorage.removeItem("userProfile");
+  login: async ({ token }) => {
+    // 1️⃣ Save token first
+    await AsyncStorage.setItem("token", token);
+    set({ token });
 
-    set({
-      user: null,
-      token: null,
+    // 2️⃣ Fetch authoritative user profile
+    const res = await fetch(`${API_URL}/users/me`, {
+      headers: headers(token),
     });
+
+    const data = await res.json();
+    const user = data.user || data;
+
+    // 3️⃣ Save correct user
+    await AsyncStorage.setItem("user", JSON.stringify(user));
+    set({ user });
   },
 
-  // -----------------------------------
-  // Full wipe (used in Profile fadeOut)
-  // -----------------------------------
-  clearAuth: async () => {
-    await AsyncStorage.removeItem("token");
-    await AsyncStorage.removeItem("userProfile");
-
-    set({
-      user: null,
-      token: null,
-    });
+  logoutAndReset: async () => {
+    await AsyncStorage.multiRemove(["token", "user"]);
+    set({ token: null, user: null });
   },
 }));

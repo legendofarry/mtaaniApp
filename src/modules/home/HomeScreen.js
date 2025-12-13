@@ -1,228 +1,425 @@
-import React from "react";
+// src/modules/home/HomeScreen.js
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
+  Image,
+  RefreshControl,
+  Animated,
+  Dimensions,
 } from "react-native";
 import { useTheme } from "../../common/ThemeProvider";
-import { Icon } from "../../common/Icons";
+import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { LinearGradient } from "expo-linear-gradient";
 
-export default function HomeScreen() {
+const { width } = Dimensions.get("window");
+
+export default function HomeScreen({ navigation }) {
   const { theme } = useTheme();
+  const [user, setUser] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+  const scaleAnim = useRef(new Animated.Value(0.9)).current;
+
+  useEffect(() => {
+    loadUser();
+    animateIn();
+  }, []);
+
+  const animateIn = () => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        tension: 50,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        tension: 50,
+        friction: 7,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const loadUser = async () => {
+    try {
+      const userData = await AsyncStorage.getItem("user");
+      if (userData) {
+        setUser(JSON.parse(userData));
+      }
+    } catch (err) {
+      console.log("Error loading user:", err);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadUser();
+    setTimeout(() => setRefreshing(false), 1000);
+  };
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 18) return "Good afternoon";
+    return "Good evening";
+  };
+
+  const getFirstName = () => {
+    if (!user?.fullName) return "User";
+    return user.fullName.split(" ")[0];
+  };
+
+  const AnimatedCard = ({ children, delay = 0, style }) => {
+    const cardAnim = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+      Animated.timing(cardAnim, {
+        toValue: 1,
+        duration: 500,
+        delay,
+        useNativeDriver: true,
+      }).start();
+    }, []);
+
+    return (
+      <Animated.View
+        style={[
+          {
+            opacity: cardAnim,
+            transform: [
+              {
+                translateY: cardAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [20, 0],
+                }),
+              },
+            ],
+          },
+          style,
+        ]}
+      >
+        {children}
+      </Animated.View>
+    );
+  };
 
   return (
     <View
       style={[styles.container, { backgroundColor: theme.colors.background }]}
     >
-      {/* HEADER */}
-      <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
-        <Text style={[styles.logo, { color: theme.colors.primary }]}>Flow</Text>
-        <TouchableOpacity style={styles.notificationBtn} activeOpacity={0.7}>
-          <View style={styles.notificationIconWrapper}>
-            <Icon
-              name="notifications-outline"
-              size={22}
-              color={theme.colors.textSecondary}
-            />
-            <View
-              style={[styles.badge, { backgroundColor: theme.colors.error }]}
-            />
-          </View>
-        </TouchableOpacity>
-      </View>
-
-      {/* MAIN CONTENT */}
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+      {/* Modern Header with Gradient */}
+      <LinearGradient
+        colors={["#fff"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.header}
       >
-        {/* Welcome Section */}
-        <View style={styles.welcomeSection}>
-          <Text
-            style={[
-              styles.welcomeGreeting,
-              { color: theme.colors.textSecondary },
-            ]}
+        <Animated.View
+          style={[
+            styles.headerContent,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}
+        >
+          <View style={styles.headerLeft}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => navigation.navigate("Profile")}
+              style={styles.avatarContainer}
+            >
+              {user?.profileImageUrl ? (
+                <Image
+                  source={{ uri: user.profileImageUrl }}
+                  style={styles.avatar}
+                />
+              ) : (
+                <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                  <Text style={styles.avatarText}>
+                    {getFirstName().charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+              )}
+              <View style={styles.onlineIndicator} />
+            </TouchableOpacity>
+            <View style={styles.greetingContainer}>
+              <Text style={styles.userName}>{getFirstName()} 👋</Text>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={styles.notificationBtn}
+            onPress={() => navigation.navigate("Notifications")}
+            activeOpacity={0.7}
           >
-            Good morning
-          </Text>
-          <Text
-            style={[styles.welcomeTitle, { color: theme.colors.textPrimary }]}
-          >
-            Welcome back 👋
-          </Text>
+            <View style={styles.notificationIconWrap}>
+              <Ionicons
+                name="notifications-outline"
+                size={24}
+                color="#023020"
+              />
+              <View style={styles.notificationDot} />
+            </View>
+          </TouchableOpacity>
+        </Animated.View>
+      </LinearGradient>
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        style={{ backgroundColor: "#F7F7F7" }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={theme.colors.primary}
+          />
+        }
+      >
+        {/* Quick Status Cards */}
+        <View style={styles.statusSection}>
+          <AnimatedCard delay={100}>
+            <TouchableOpacity
+              style={[
+                styles.statusCard,
+                { backgroundColor: theme.colors.surface },
+              ]}
+              onPress={() => navigation.navigate("Water")}
+              activeOpacity={0.7}
+            >
+              <LinearGradient
+                colors={["#3b82f6", "#2563eb"]}
+                style={styles.statusIconGradient}
+              >
+                <Ionicons name="water" size={24} color="#fff" />
+              </LinearGradient>
+              <View style={styles.statusContent}>
+                <Text
+                  style={[
+                    styles.statusLabel,
+                    { color: theme.colors.textSecondary },
+                  ]}
+                >
+                  Water Status
+                </Text>
+                <Text
+                  style={[
+                    styles.statusValue,
+                    { color: theme.colors.textPrimary },
+                  ]}
+                >
+                  Available
+                </Text>
+                <Text
+                  style={[
+                    styles.statusTime,
+                    { color: theme.colors.textDisabled },
+                  ]}
+                >
+                  Updated 10m ago
+                </Text>
+              </View>
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={theme.colors.textDisabled}
+              />
+            </TouchableOpacity>
+          </AnimatedCard>
+
+          <AnimatedCard delay={200}>
+            <TouchableOpacity
+              style={[
+                styles.statusCard,
+                { backgroundColor: theme.colors.surface },
+              ]}
+              onPress={() => navigation.navigate("Electricity")}
+              activeOpacity={0.7}
+            >
+              <LinearGradient
+                colors={["#eab308", "#ca8a04"]}
+                style={styles.statusIconGradient}
+              >
+                <Ionicons name="flash" size={24} color="#fff" />
+              </LinearGradient>
+              <View style={styles.statusContent}>
+                <Text
+                  style={[
+                    styles.statusLabel,
+                    { color: theme.colors.textSecondary },
+                  ]}
+                >
+                  Token Balance
+                </Text>
+                <Text
+                  style={[
+                    styles.statusValue,
+                    { color: theme.colors.textPrimary },
+                  ]}
+                >
+                  8Hrs
+                </Text>
+                <Text
+                  style={[
+                    styles.statusTime,
+                    { color: theme.colors.textDisabled },
+                  ]}
+                >
+                  2.5 days left
+                </Text>
+              </View>
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={theme.colors.textDisabled}
+              />
+            </TouchableOpacity>
+          </AnimatedCard>
         </View>
 
-        {/* STATUS CARDS - Grid Layout */}
-        <View style={styles.cardsGrid}>
-          {/* WATER STATUS CARD */}
-          <View
-            style={[
-              styles.card,
-              {
-                backgroundColor: theme.colors.surface,
-                shadowColor: theme.colors.primary + "20",
-              },
-            ]}
-          >
-            <View style={styles.cardIconContainer}>
-              <View
-                style={[
-                  styles.iconBackground,
-                  { backgroundColor: theme.colors.primary + "15" },
-                ]}
-              >
-                <Icon name="water" size={24} color={theme.colors.primary} />
-              </View>
-            </View>
-            <Text
-              style={[styles.cardTitle, { color: theme.colors.textPrimary }]}
-            >
-              Water Status
-            </Text>
-            <Text style={[styles.cardValue, { color: theme.colors.primary }]}>
-              ON in your area
-            </Text>
-            <Text
-              style={[styles.cardSub, { color: theme.colors.textSecondary }]}
-            >
-              Updated 10 min ago
-            </Text>
-          </View>
-
-          {/* ELECTRICITY STATUS CARD */}
-          <View
-            style={[
-              styles.card,
-              {
-                backgroundColor: theme.colors.surface,
-                shadowColor: theme.colors.warning + "20",
-              },
-            ]}
-          >
-            <View style={styles.cardIconContainer}>
-              <View
-                style={[
-                  styles.iconBackground,
-                  { backgroundColor: theme.colors.warning + "15" },
-                ]}
-              >
-                <Icon name="flash" size={24} color={theme.colors.warning} />
-              </View>
-            </View>
-            <Text
-              style={[styles.cardTitle, { color: theme.colors.textPrimary }]}
-            >
-              Electricity Balance
-            </Text>
-            <Text
-              style={[styles.cardValue, { color: theme.colors.textPrimary }]}
-            >
-              KSh 128
-            </Text>
-            <Text
-              style={[styles.cardSub, { color: theme.colors.textSecondary }]}
-            >
-              2.5 days remaining
-            </Text>
-          </View>
-
-          {/* PREDICTIONS CARD */}
-          <View
-            style={[
-              styles.card,
-              {
-                backgroundColor: theme.colors.surface,
-                shadowColor: theme.colors.primary + "20",
-              },
-            ]}
-          >
-            <View style={styles.cardIconContainer}>
-              <View
-                style={[
-                  styles.iconBackground,
-                  { backgroundColor: theme.colors.primary + "15" },
-                ]}
-              >
-                <Icon
-                  name="time-outline"
-                  size={24}
-                  color={theme.colors.primary}
-                />
-              </View>
-            </View>
-            <Text
-              style={[styles.cardTitle, { color: theme.colors.textPrimary }]}
-            >
-              Next Water
-            </Text>
-            <Text
-              style={[styles.cardValue, { color: theme.colors.textPrimary }]}
-            >
-              8:00 AM
-            </Text>
-            <Text
-              style={[styles.cardSub, { color: theme.colors.textSecondary }]}
-            >
-              14-day trend analysis
-            </Text>
-          </View>
-
-          {/* VENDOR ALERTS CARD */}
-          <View
-            style={[
-              styles.card,
-              {
-                backgroundColor: theme.colors.surface,
-                shadowColor: theme.colors.primary + "20",
-              },
-            ]}
-          >
-            <View style={styles.cardIconContainer}>
-              <View
-                style={[
-                  styles.iconBackground,
-                  { backgroundColor: theme.colors.primary + "15" },
-                ]}
-              >
-                <Icon
-                  name="storefront-outline"
-                  size={24}
-                  color={theme.colors.primary}
-                />
-              </View>
-            </View>
-            <Text
-              style={[styles.cardTitle, { color: theme.colors.textPrimary }]}
-            >
-              Nearby Vendors
-            </Text>
-            <Text
-              style={[styles.cardValue, { color: theme.colors.textPrimary }]}
-            >
-              2 Available
-            </Text>
-            <Text
-              style={[styles.cardSub, { color: theme.colors.textSecondary }]}
-            >
-              Mkokoteni & kiosk nearby
-            </Text>
-          </View>
-        </View>
-
-        {/* RECENT ACTIVITY SECTION */}
+        {/* Quick Actions Grid */}
         <View style={styles.section}>
+          <Text
+            style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}
+          >
+            Quick Actions
+          </Text>
+
+          <View style={styles.actionsGrid}>
+            <AnimatedCard delay={300}>
+              <TouchableOpacity
+                style={[
+                  styles.actionCard,
+                  { backgroundColor: theme.colors.surface },
+                ]}
+                onPress={() => navigation.navigate("ReportWater")}
+                activeOpacity={0.7}
+              >
+                <View
+                  style={[styles.actionIcon, { backgroundColor: "#3b82f615" }]}
+                >
+                  <Ionicons name="add-circle" size={28} color="#3b82f6" />
+                </View>
+                <Text
+                  style={[
+                    styles.actionText,
+                    { color: theme.colors.textPrimary },
+                  ]}
+                >
+                  Report Water
+                </Text>
+              </TouchableOpacity>
+            </AnimatedCard>
+
+            <AnimatedCard delay={350}>
+              <TouchableOpacity
+                style={[
+                  styles.actionCard,
+                  { backgroundColor: theme.colors.surface },
+                ]}
+                onPress={() => navigation.navigate("ReportBlackout")}
+                activeOpacity={0.7}
+              >
+                <View
+                  style={[styles.actionIcon, { backgroundColor: "#eab30815" }]}
+                >
+                  <Ionicons name="flash" size={28} color="#eab308" />
+                </View>
+                <Text
+                  style={[
+                    styles.actionText,
+                    { color: theme.colors.textPrimary },
+                  ]}
+                >
+                  Report Blackout
+                </Text>
+              </TouchableOpacity>
+            </AnimatedCard>
+
+            <AnimatedCard delay={400}>
+              <TouchableOpacity
+                style={[
+                  styles.actionCard,
+                  { backgroundColor: theme.colors.surface },
+                ]}
+                onPress={() => navigation.navigate("WaterPrediction")}
+                activeOpacity={0.7}
+              >
+                <View
+                  style={[styles.actionIcon, { backgroundColor: "#8b5cf615" }]}
+                >
+                  <Ionicons name="time-outline" size={28} color="#8b5cf6" />
+                </View>
+                <Text
+                  style={[
+                    styles.actionText,
+                    { color: theme.colors.textPrimary },
+                  ]}
+                >
+                  Predictions
+                </Text>
+              </TouchableOpacity>
+            </AnimatedCard>
+
+            <AnimatedCard delay={450}>
+              <TouchableOpacity
+                style={[
+                  styles.actionCard,
+                  { backgroundColor: theme.colors.surface },
+                ]}
+                onPress={() => navigation.navigate("Vendors")}
+                activeOpacity={0.7}
+              >
+                <View
+                  style={[styles.actionIcon, { backgroundColor: "#10b98115" }]}
+                >
+                  <Ionicons name="people-outline" size={28} color="#10b981" />
+                </View>
+                <Text
+                  style={[
+                    styles.actionText,
+                    { color: theme.colors.textPrimary },
+                  ]}
+                >
+                  Water Vendors
+                </Text>
+              </TouchableOpacity>
+            </AnimatedCard>
+          </View>
+        </View>
+
+        {/* Recent Updates */}
+        <AnimatedCard delay={500} style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text
               style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}
             >
-              Recent Activity
+              Recent Updates
             </Text>
-            <TouchableOpacity activeOpacity={0.6}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate("ActivityFeed")}
+            >
               <Text
-                style={[styles.seeAllText, { color: theme.colors.primary }]}
+                style={{
+                  color: theme.colors.primary,
+                  fontSize: 13,
+                  fontWeight: "600",
+                }}
               >
                 See all
               </Text>
@@ -235,47 +432,125 @@ export default function HomeScreen() {
               { backgroundColor: theme.colors.surface },
             ]}
           >
-            <View style={styles.activityRow}>
-              <View
+            <TouchableOpacity style={styles.activityItem} activeOpacity={0.7}>
+              <View style={styles.activityLeft}>
+                <View
+                  style={[
+                    styles.activityIcon,
+                    { backgroundColor: "#22c55e20" },
+                  ]}
+                >
+                  <Ionicons name="checkmark-circle" size={20} color="#22c55e" />
+                </View>
+                <View style={styles.activityContent}>
+                  <Text
+                    style={[
+                      styles.activityTitle,
+                      { color: theme.colors.textPrimary },
+                    ]}
+                  >
+                    Water restored in your area
+                  </Text>
+                  <Text
+                    style={[
+                      styles.activityTime,
+                      { color: theme.colors.textSecondary },
+                    ]}
+                  >
+                    2 hours ago
+                  </Text>
+                </View>
+              </View>
+              <Ionicons
+                name="chevron-forward"
+                size={18}
+                color={theme.colors.textDisabled}
+              />
+            </TouchableOpacity>
+
+            <View style={styles.divider} />
+
+            <TouchableOpacity style={styles.activityItem} activeOpacity={0.7}>
+              <View style={styles.activityLeft}>
+                <View
+                  style={[
+                    styles.activityIcon,
+                    { backgroundColor: "#3b82f620" },
+                  ]}
+                >
+                  <Ionicons name="pricetag" size={20} color="#3b82f6" />
+                </View>
+                <View style={styles.activityContent}>
+                  <Text
+                    style={[
+                      styles.activityTitle,
+                      { color: theme.colors.textPrimary },
+                    ]}
+                  >
+                    Vendor updated prices nearby
+                  </Text>
+                  <Text
+                    style={[
+                      styles.activityTime,
+                      { color: theme.colors.textSecondary },
+                    ]}
+                  >
+                    5 hours ago
+                  </Text>
+                </View>
+              </View>
+              <Ionicons
+                name="chevron-forward"
+                size={18}
+                color={theme.colors.textDisabled}
+              />
+            </TouchableOpacity>
+          </View>
+        </AnimatedCard>
+
+        {/* Prediction Card */}
+        <AnimatedCard delay={550} style={styles.section}>
+          <TouchableOpacity
+            style={[
+              styles.predictionCard,
+              { backgroundColor: theme.colors.surface },
+            ]}
+            onPress={() => navigation.navigate("WaterPrediction")}
+            activeOpacity={0.7}
+          >
+            <LinearGradient
+              colors={["#8b5cf6", "#7c3aed"]}
+              style={styles.predictionGradient}
+            >
+              <Ionicons name="sparkles" size={24} color="#fff" />
+            </LinearGradient>
+            <View style={styles.predictionContent}>
+              <Text
                 style={[
-                  styles.activityIcon,
-                  { backgroundColor: theme.colors.primary + "15" },
+                  styles.predictionTitle,
+                  { color: theme.colors.textPrimary },
                 ]}
               >
-                <Icon
-                  name="checkmark-circle"
-                  size={20}
-                  color={theme.colors.primary}
-                />
-              </View>
-              <View style={styles.activityContent}>
-                <Text
-                  style={[
-                    styles.activityTitle,
-                    { color: theme.colors.textPrimary },
-                  ]}
-                >
-                  Water restored
-                </Text>
-                <Text
-                  style={[
-                    styles.activityTime,
-                    { color: theme.colors.textSecondary },
-                  ]}
-                >
-                  2 hours ago
-                </Text>
-              </View>
+                Next Water Prediction
+              </Text>
               <Text
-                style={[styles.activityStatus, { color: theme.colors.success }]}
+                style={[
+                  styles.predictionValue,
+                  { color: theme.colors.primary },
+                ]}
               >
-                Completed
+                Tomorrow at 8:00 AM
               </Text>
             </View>
-          </View>
-        </View>
+            <Ionicons
+              name="arrow-forward"
+              size={20}
+              color={theme.colors.primary}
+            />
+          </TouchableOpacity>
+        </AnimatedCard>
 
-        <View style={styles.bottomSpacing} />
+        <View style={{ height: 32 }} />
       </ScrollView>
     </View>
   );
@@ -285,146 +560,194 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-
-  /* HEADER */
   header: {
-    height: 60,
-    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 10,
+    paddingHorizontal: 16,
+  },
+  headerContent: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  headerLeft: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    elevation: 2,
   },
-  logo: {
-    fontSize: 22,
-    fontWeight: "700",
-  },
-  notificationBtn: {
+  avatarContainer: {
+    marginRight: 12,
     position: "relative",
   },
-  badge: {
-    width: 10,
-    height: 10,
-    borderRadius: 6,
-    position: "absolute",
-    top: -2,
-    right: -2,
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: "#fff",
   },
-
-  /* CONTENT */
-  welcome: {
-    fontSize: 22,
+  avatarPlaceholder: {
+    backgroundColor: "#E0E0E0",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  avatarText: {
+    fontSize: 20,
     fontWeight: "700",
-    marginBottom: 14,
+    color: "#667eea",
   },
-
-  card: {
-    width: "100%",
-    padding: 18,
-    borderRadius: 12,
-    marginBottom: 16,
-    elevation: 2,
+  onlineIndicator: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: "#22c55e",
+    borderWidth: 2,
+    borderColor: "#764ba2",
   },
-  cardRow: {
+  greetingContainer: {
+    justifyContent: "center",
+  },
+  greeting: {
+    fontSize: 13,
+    color: "#ffffffaa",
+    marginBottom: 2,
+  },
+  userName: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#023020",
+    marginBottom: 2,
+  },
+  location: {
+    fontSize: 12,
+    color: "#ffffffaa",
+  },
+  notificationBtn: {
+    padding: 8,
+  },
+  notificationIconWrap: {
+    position: "relative",
+  },
+  notificationDot: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#ef4444",
+    borderWidth: 1.5,
+    borderColor: "#764ba2",
+  },
+  statusSection: {
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    gap: 12,
+  },
+  statusCard: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 6,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginLeft: 12,
-  },
-  cardSub: {
-    fontSize: 14,
-  },
-  scrollContent: {
-    padding: 16,
-  },
-  welcomeSection: {
-    marginBottom: 24,
-  },
-  welcomeGreeting: {
-    fontSize: 14,
-    marginBottom: 4,
-  },
-  welcomeTitle: {
-    fontSize: 32,
-    fontWeight: "700",
-    letterSpacing: -0.5,
-  },
-  cardsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    marginBottom: 24,
-  },
-  card: {
-    width: "48%",
     padding: 16,
     borderRadius: 16,
-    marginBottom: 16,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 8,
-    elevation: 2,
+    elevation: 3,
   },
-  cardIconContainer: {
-    marginBottom: 12,
-  },
-  iconBackground: {
+  statusIconGradient: {
     width: 48,
     height: 48,
     borderRadius: 24,
     justifyContent: "center",
     alignItems: "center",
+    marginRight: 14,
   },
-  cardTitle: {
-    fontSize: 14,
-    marginBottom: 4,
-    opacity: 0.8,
+  statusContent: {
+    flex: 1,
   },
-  cardValue: {
-    fontSize: 20,
-    fontWeight: "600",
-    marginBottom: 4,
-  },
-  cardSub: {
+  statusLabel: {
     fontSize: 12,
+    marginBottom: 4,
   },
-  notificationIconWrapper: {
-    position: "relative",
-    padding: 8,
+  statusValue: {
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 2,
+  },
+  statusTime: {
+    fontSize: 11,
   },
   section: {
-    marginTop: 8,
+    paddingHorizontal: 16,
+    marginTop: 28,
   },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: 14,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: "600",
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 14,
   },
-  seeAllText: {
-    fontSize: 14,
-    fontWeight: "500",
+  actionsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  actionCard: {
+    width: (width - 44) / 2,
+    padding: 16,
+    borderRadius: 16,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  actionIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  actionText: {
+    fontSize: 13,
+    fontWeight: "600",
+    textAlign: "center",
   },
   activityCard: {
-    borderRadius: 12,
     padding: 16,
+    borderRadius: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
-  activityRow: {
+  activityItem: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 8,
+  },
+  activityLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
   },
   activityIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
@@ -433,18 +756,46 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   activityTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "500",
     marginBottom: 2,
   },
   activityTime: {
+    fontSize: 12,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#f3f4f6",
+    marginVertical: 8,
+  },
+  predictionCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    borderRadius: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  predictionGradient: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 14,
+  },
+  predictionContent: {
+    flex: 1,
+  },
+  predictionTitle: {
     fontSize: 13,
+    marginBottom: 4,
   },
-  activityStatus: {
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  bottomSpacing: {
-    height: 32,
+  predictionValue: {
+    fontSize: 16,
+    fontWeight: "700",
   },
 });

@@ -1,11 +1,12 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { View, StyleSheet, Animated } from "react-native";
 import LottieView from "lottie-react-native";
 import { useNavigation } from "@react-navigation/native";
 
 export default function SplashAfterLogin() {
   const navigation = useNavigation();
-  const fade = new Animated.Value(0);
+
+  const fade = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     // fade in

@@ -51,6 +51,7 @@ export default function Onboarding({ route, navigation }) {
   const [avatarLocalUri, setAvatarLocalUri] = useState(null);
   const [avatarBase64, setAvatarBase64] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState(""); // ⭐ Add error state
 
   // camera state (only for mobile)
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -185,20 +186,27 @@ export default function Onboarding({ route, navigation }) {
     console.log("Age:", age);
 
     if (!phone || phone.length < 7) {
-      Alert.alert("Enter phone", "Please enter a valid phone number.");
+      const msg = "Please enter a valid phone number (at least 7 digits).";
+      setError(msg);
+      Alert.alert("Enter phone", msg);
       return false;
     }
     if (!location.area || location.area.trim().length < 2) {
-      Alert.alert("Enter area", "Please enter your area (neighbourhood).");
+      const msg = "Please enter your area (neighbourhood).";
+      setError(msg);
+      Alert.alert("Enter area", msg);
       return false;
     }
 
     const ageNum = parseInt(age, 10);
     if (!age || isNaN(ageNum) || ageNum < 10 || ageNum > 120) {
-      Alert.alert("Enter age", "Please enter a valid age (10-120).");
+      const msg = "Please enter a valid age (10-120).";
+      setError(msg);
+      Alert.alert("Enter age", msg);
       return false;
     }
 
+    setError("");
     console.log("✅ Validation passed!");
     return true;
   };
@@ -619,6 +627,20 @@ export default function Onboarding({ route, navigation }) {
 
           <View style={{ height: 14 }} />
 
+          {/* ⭐ Error message */}
+          {error ? (
+            <View
+              style={{
+                backgroundColor: "#fee2e2",
+                padding: 12,
+                borderRadius: 8,
+                marginBottom: 12,
+              }}
+            >
+              <Text style={{ color: "#dc2626", fontSize: 14 }}>{error}</Text>
+            </View>
+          ) : null}
+
           {uploading ? (
             <View style={{ alignItems: "center" }}>
               <ActivityIndicator size="large" color={theme.colors.primary} />
@@ -629,13 +651,11 @@ export default function Onboarding({ route, navigation }) {
               </Text>
             </View>
           ) : (
-            <>
-              <Button
-                title="Finish & Go to Home"
-                onPress={handleSaveProfile}
-                disabled={uploading}
-              />
-            </>
+            <Button
+              title="Finish & Go to Home"
+              onPress={handleSaveProfile}
+              disabled={uploading}
+            />
           )}
 
           <View style={{ height: 28 }} />

@@ -4,6 +4,7 @@ import AuthStack from "./navigation/AuthStack";
 import MainStack from "./navigation/MainStack";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import SplashScreen from "./navigation/SplashScreen";
+import SplashAfterLogin from "./navigation/SplashAfterLogin";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import Onboarding from "../auth/Onboarding";
 import { API_URL, headers } from "../services/api";
@@ -14,6 +15,7 @@ export default function Routes() {
   const [loading, setLoading] = useState(true);
   const [loggedIn, setLoggedIn] = useState(false);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [showOnboardingSplash, setShowOnboardingSplash] = useState(false);
   const [userId, setUserId] = useState(null);
   const [token, setToken] = useState(null);
 
@@ -23,6 +25,19 @@ export default function Routes() {
 
   const checkAuthAndOnboarding = async () => {
     try {
+      // ⭐ Check if onboarding just completed
+      const justCompleted = await AsyncStorage.getItem(
+        "onboardingJustCompleted"
+      );
+      if (justCompleted === "true") {
+        await AsyncStorage.removeItem("onboardingJustCompleted");
+        setShowOnboardingSplash(true);
+        setLoggedIn(true);
+        setNeedsOnboarding(false);
+        setLoading(false);
+        return;
+      }
+
       const storedToken = await AsyncStorage.getItem("token");
       const storedUser = await AsyncStorage.getItem("user");
 
@@ -97,6 +112,11 @@ export default function Routes() {
 
   if (loading) {
     return <SplashScreen />;
+  }
+
+  // ⭐ Show splash after onboarding completion
+  if (showOnboardingSplash) {
+    return <SplashAfterLogin />;
   }
 
   // Not logged in → show auth screens

@@ -192,10 +192,13 @@ export default function Onboarding({ route, navigation }) {
       Alert.alert("Enter area", "Please enter your area (neighbourhood).");
       return false;
     }
-    if (!age || isNaN(parseInt(age, 10)) || parseInt(age, 10) < 10) {
-      Alert.alert("Enter age", "Please enter a valid age.");
+
+    const ageNum = parseInt(age, 10);
+    if (!age || isNaN(ageNum) || ageNum < 10 || ageNum > 120) {
+      Alert.alert("Enter age", "Please enter a valid age (10-120).");
       return false;
     }
+
     console.log("✅ Validation passed!");
     return true;
   };

@@ -630,17 +630,6 @@ export default function Onboarding({ route, navigation }) {
             </View>
           ) : (
             <>
-              <TouchableOpacity
-                onPress={() => console.log("TEST: Button was pressed!")}
-                style={{
-                  padding: 10,
-                  backgroundColor: "red",
-                  marginBottom: 10,
-                }}
-              >
-                <Text style={{ color: "white" }}>TEST BUTTON (DELETE ME)</Text>
-              </TouchableOpacity>
-
               <Button
                 title="Finish & Go to Home"
                 onPress={handleSaveProfile}

@@ -9,19 +9,24 @@ import {
   Animated,
   ScrollView,
   Alert,
+  Platform,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useTheme } from "../common/ThemeProvider";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useAuth } from "../store/useAuth";
+import Modal from "../common/Modal";
 
 export default function Profile() {
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
   const { theme } = useTheme();
   const navigation = useNavigation();
   const [user, setUser] = useState(null);
   const opacity = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
+  const logoutAndReset = useAuth((state) => state.logoutAndReset);
 
   useEffect(() => {
     loadUser();
@@ -58,21 +63,29 @@ export default function Profile() {
     });
   };
 
-  const handleLogout = async () => {
-    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
-      {
-        text: "Cancel",
-        style: "cancel",
-      },
-      {
-        text: "Sign Out",
-        style: "destructive",
-        onPress: async () => {
-          await fadeOut();
-          navigation.replace("LogoutSplash");
-        },
-      },
-    ]);
+  const performLogout = async () => {
+    console.log("performLogout fired");
+    await fadeOut();
+    await logoutAndReset();
+  };
+
+  const confirmAndLogout = () => {
+    setTimeout(() => {
+      performLogout();
+    }, 0);
+  };
+
+  const cancelLogout = () => {
+    setShowLogoutModal(false);
+  };
+
+  const confirmLogout = () => {
+    setShowLogoutModal(false);
+    confirmAndLogout();
+  };
+
+  const handleLogout = () => {
+    setShowLogoutModal(true);
   };
 
   const getInitials = () => {
@@ -435,11 +448,7 @@ export default function Profile() {
         <AnimatedCard delay={350}>
           <TouchableOpacity
             style={styles.logoutButton}
-            onPress={async () => {
-              await fadeOut();
-              await fadeOut();
-              navigation.replace("LogoutSplash");
-            }}
+            onPress={handleLogout}
             activeOpacity={0.7}
           >
             <LinearGradient
@@ -456,6 +465,16 @@ export default function Profile() {
           Version 1.0.0 • © 2025 MtaaniFlow
         </Text>
       </ScrollView>
+
+      <Modal
+        visible={showLogoutModal}
+        title="Sign Out"
+        message="Are you sure you want to sign out?"
+        cancelText="Cancel"
+        confirmText="Sign Out"
+        onCancel={cancelLogout}
+        onConfirm={confirmLogout}
+      />
     </Animated.View>
   );
 }
@@ -465,7 +484,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerGradient: {
-    paddingTop: 60,
+    paddingTop: 10,
     paddingBottom: 40,
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
@@ -539,7 +558,7 @@ const styles = StyleSheet.create({
   },
   statsContainer: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "center",
     paddingHorizontal: 20,
     marginTop: -25,
     marginBottom: 24,
@@ -547,6 +566,7 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
+    width: 130,
     backgroundColor: "#FFFFFF",
     borderRadius: 20,
     padding: 20,

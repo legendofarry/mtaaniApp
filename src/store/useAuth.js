@@ -2,10 +2,11 @@ import { create } from "zustand";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_URL, headers } from "../services/api";
 
-export const useAuth = create((set) => ({
+export const useAuth = create((set, get) => ({
   user: null,
   token: null,
   isRestored: false,
+  shouldShowPostAuthSplash: false, // ⭐ NEW
 
   restoreAuth: async () => {
     try {
@@ -17,6 +18,7 @@ export const useAuth = create((set) => ({
           token,
           user: JSON.parse(user),
           isRestored: true,
+          shouldShowPostAuthSplash: false, // ❗ cold start → no splash
         });
       } else {
         set({ isRestored: true });
@@ -27,11 +29,9 @@ export const useAuth = create((set) => ({
   },
 
   login: async ({ token }) => {
-    // 1️⃣ Save token first
     await AsyncStorage.setItem("token", token);
     set({ token });
 
-    // 2️⃣ Fetch authoritative user profile
     const res = await fetch(`${API_URL}/users/me`, {
       headers: headers(token),
     });
@@ -39,13 +39,39 @@ export const useAuth = create((set) => ({
     const data = await res.json();
     const user = data.user || data;
 
-    // 3️⃣ Save correct user
     await AsyncStorage.setItem("user", JSON.stringify(user));
-    set({ user });
+    set({
+      user,
+      shouldShowPostAuthSplash: true, // ⭐ after login
+    });
+  },
+
+  completeOnboarding: async () => {
+    const { user } = get();
+    if (!user) return;
+
+    const updatedUser = {
+      ...user,
+      onboardingCompleted: true,
+    };
+
+    await AsyncStorage.setItem("user", JSON.stringify(updatedUser));
+    set({
+      user: updatedUser,
+      shouldShowPostAuthSplash: true, // ⭐ after onboarding
+    });
+  },
+
+  clearPostAuthSplash: () => {
+    set({ shouldShowPostAuthSplash: false });
   },
 
   logoutAndReset: async () => {
     await AsyncStorage.multiRemove(["token", "user"]);
-    set({ token: null, user: null });
+    set({
+      token: null,
+      user: null,
+      shouldShowPostAuthSplash: false,
+    });
   },
 }));

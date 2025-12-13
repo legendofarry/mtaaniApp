@@ -2,22 +2,21 @@ import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
 import BottomTabs from "./BottomTabs";
-import AuthStack from "./AuthStack";
 import SplashAfterLogin from "./SplashAfterLogin";
-import LogoutSplash from "./LogoutSplash";
+import { useAuth } from "../../store/useAuth";
 
 const Stack = createNativeStackNavigator();
 
 export default function MainStack() {
+  const shouldShowSplash = useAuth((state) => state.shouldShowPostAuthSplash);
+
   return (
     <Stack.Navigator
-      initialRouteName="SplashAfterLogin"
+      initialRouteName={shouldShowSplash ? "SplashAfterLogin" : "Tabs"}
       screenOptions={{ headerShown: false }}
     >
       <Stack.Screen name="SplashAfterLogin" component={SplashAfterLogin} />
       <Stack.Screen name="Tabs" component={BottomTabs} />
-      <Stack.Screen name="LogoutSplash" component={LogoutSplash} />
-      <Stack.Screen name="AuthStack" component={AuthStack} />
     </Stack.Navigator>
   );
 }

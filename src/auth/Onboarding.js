@@ -23,6 +23,7 @@ import * as ImagePicker from "expo-image-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_URL, headers } from "../services/api";
 import { search } from "kenya-locations";
+import { useAuth } from "../store/useAuth";
 
 // Only import Camera on mobile
 const Camera = Platform.OS !== "web" ? require("expo-camera").Camera : null;
@@ -69,6 +70,8 @@ export default function Onboarding({ route, navigation }) {
   );
 
   const [token, setToken] = useState(routeToken || null);
+
+  const completeOnboarding = useAuth((state) => state.completeOnboarding);
 
   useEffect(() => {
     if (!token) {
@@ -333,8 +336,9 @@ export default function Onboarding({ route, navigation }) {
         }
 
         await AsyncStorage.setItem("user", JSON.stringify(resJson.user || {}));
-        navigation.reset &&
-          navigation.reset({ index: 0, routes: [{ name: "Tabs" }] });
+        await completeOnboarding();
+        // ❌ DO NOT NAVIGATE
+
         return;
       }
 
@@ -373,7 +377,8 @@ export default function Onboarding({ route, navigation }) {
       }
 
       await AsyncStorage.setItem("user", JSON.stringify(json2.user || {}));
-      navigation.replace("SplashAfterLogin");
+      await completeOnboarding();
+      // ❌ DO NOT NAVIGATE
     } catch (err) {
       setUploading(false);
       console.log("Save profile error", err);

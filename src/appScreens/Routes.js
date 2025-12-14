@@ -25,7 +25,6 @@ export default function Routes() {
 
   // Logged in but not onboarded
   if (user && user.onboardingCompleted !== true) {
-    console.log("Not onboarded", user.onboardingCompleted);
     return (
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen

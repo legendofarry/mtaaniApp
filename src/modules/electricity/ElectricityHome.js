@@ -344,6 +344,7 @@ export default function ElectricityHome({ navigation }) {
                     color: theme.colors.primary,
                     fontSize: 13,
                     fontWeight: "600",
+                    fontFamily: "Montserrat_700Bold",
                   }}
                 >
                   View all
@@ -559,11 +560,13 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "700",
     color: "#fff",
+    fontFamily: "Montserrat_700Bold",
   },
   headerSubtitle: {
     fontSize: 12,
     color: "#ffffffaa",
     marginTop: 2,
+    fontFamily: "Montserrat_700Bold",
   },
   historyBtn: {
     padding: 4,
@@ -591,9 +594,11 @@ const styles = StyleSheet.create({
   balanceLabel: {
     fontSize: 13,
     marginBottom: 8,
+    fontFamily: "Montserrat_700Bold",
   },
   balanceValue: {
     fontSize: 36,
+    fontFamily: "Montserrat_700Bold",
     fontWeight: "700",
     marginBottom: 16,
   },
@@ -609,6 +614,7 @@ const styles = StyleSheet.create({
   },
   balanceDetailText: {
     fontSize: 12,
+    fontFamily: "Montserrat_700Bold",
   },
   progressContainer: {
     width: "100%",
@@ -635,6 +641,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
+    fontFamily: "Montserrat_700Bold",
     fontWeight: "700",
   },
   quickActions: {
@@ -662,6 +669,7 @@ const styles = StyleSheet.create({
   },
   quickActionText: {
     fontSize: 12,
+    fontFamily: "Montserrat_700Bold",
     fontWeight: "600",
     textAlign: "center",
   },
@@ -692,14 +700,17 @@ const styles = StyleSheet.create({
   },
   transactionTitle: {
     fontSize: 15,
+    fontFamily: "Montserrat_700Bold",
     fontWeight: "600",
     marginBottom: 3,
   },
   transactionDate: {
     fontSize: 12,
+    fontFamily: "Montserrat_700Bold",
   },
   transactionAmount: {
     fontSize: 16,
+    fontFamily: "Montserrat_700Bold",
     fontWeight: "700",
   },
   divider: {
@@ -733,11 +744,13 @@ const styles = StyleSheet.create({
   },
   tipsTitle: {
     fontSize: 15,
+    fontFamily: "Montserrat_700Bold",
     fontWeight: "600",
     marginBottom: 3,
   },
   tipsSubtitle: {
     fontSize: 12,
+    fontFamily: "Montserrat_700Bold",
   },
   fab: {
     position: "absolute",

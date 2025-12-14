@@ -322,6 +322,7 @@ export default function WaterHome({ navigation }) {
                     color: theme.colors.primary,
                     fontSize: 13,
                     fontWeight: "600",
+                    fontFamily: "Montserrat_700Bold",
                   }}
                 >
                   View all
@@ -526,11 +527,13 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 22,
+    fontFamily: "Montserrat_700Bold",
     fontWeight: "700",
     color: "#fff",
   },
   headerSubtitle: {
     fontSize: 12,
+    fontFamily: "Montserrat_700Bold",
     color: "#ffffffaa",
     marginTop: 2,
   },
@@ -552,6 +555,7 @@ const styles = StyleSheet.create({
   chatBadgeText: {
     color: "#fff",
     fontSize: 10,
+    fontFamily: "Montserrat_700Bold",
     fontWeight: "700",
   },
   statusCard: {
@@ -576,11 +580,13 @@ const styles = StyleSheet.create({
   },
   statusTitle: {
     fontSize: 24,
+    fontFamily: "Montserrat_700Bold",
     fontWeight: "700",
     marginBottom: 6,
   },
   statusSubtitle: {
     fontSize: 13,
+    fontFamily: "Montserrat_700Bold",
     marginBottom: 16,
   },
   statusDetails: {
@@ -594,6 +600,7 @@ const styles = StyleSheet.create({
   },
   statusDetailText: {
     fontSize: 12,
+    fontFamily: "Montserrat_700Bold",
   },
   section: {
     paddingHorizontal: 16,
@@ -607,6 +614,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
+    fontFamily: "Montserrat_700Bold",
     fontWeight: "700",
   },
   quickActions: {
@@ -634,6 +642,7 @@ const styles = StyleSheet.create({
   },
   quickActionText: {
     fontSize: 12,
+    fontFamily: "Montserrat_700Bold",
     fontWeight: "600",
     textAlign: "center",
   },
@@ -662,11 +671,13 @@ const styles = StyleSheet.create({
   },
   vendorName: {
     fontSize: 15,
+    fontFamily: "Montserrat_700Bold",
     fontWeight: "600",
     marginBottom: 3,
   },
   vendorDetail: {
     fontSize: 12,
+    fontFamily: "Montserrat_700Bold",
   },
   vendorRating: {
     flexDirection: "row",
@@ -676,6 +687,7 @@ const styles = StyleSheet.create({
   },
   vendorRatingText: {
     fontSize: 13,
+    fontFamily: "Montserrat_700Bold",
     fontWeight: "600",
   },
   predictionBanner: {
@@ -704,15 +716,18 @@ const styles = StyleSheet.create({
   },
   predictionTitle: {
     fontSize: 13,
+    fontFamily: "Montserrat_700Bold",
     marginBottom: 4,
   },
   predictionValue: {
     fontSize: 17,
+    fontFamily: "Montserrat_700Bold",
     fontWeight: "700",
     marginBottom: 3,
   },
   predictionSubtitle: {
     fontSize: 11,
+    fontFamily: "Montserrat_700Bold",
   },
   fab: {
     position: "absolute",

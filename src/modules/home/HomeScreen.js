@@ -419,6 +419,7 @@ export default function HomeScreen({ navigation }) {
                   color: theme.colors.primary,
                   fontSize: 13,
                   fontWeight: "600",
+                  fontFamily: "Montserrat_600SemiBold",
                 }}
               >
                 See all
@@ -594,6 +595,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "700",
     color: "#667eea",
+    fontFamily: "Montserrat_700Bold",
   },
   onlineIndicator: {
     position: "absolute",
@@ -619,6 +621,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#023020",
     marginBottom: 2,
+    fontFamily: "Montserrat_700Bold",
   },
   location: {
     fontSize: 12,
@@ -671,14 +674,18 @@ const styles = StyleSheet.create({
   statusLabel: {
     fontSize: 12,
     marginBottom: 4,
+    fontFamily: "Montserrat_700Bold",
   },
   statusValue: {
     fontSize: 18,
     fontWeight: "700",
+    fontFamily: "Montserrat_700Bold",
+
     marginBottom: 2,
   },
   statusTime: {
     fontSize: 11,
+    fontFamily: "Montserrat_700Bold",
   },
   section: {
     paddingHorizontal: 16,
@@ -694,6 +701,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
     marginBottom: 14,
+    fontFamily: "Montserrat_700Bold",
   },
   actionsGrid: {
     flexDirection: "row",
@@ -723,6 +731,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
     textAlign: "center",
+    fontFamily: "Montserrat_700Bold",
   },
   activityCard: {
     padding: 16,
@@ -758,10 +767,12 @@ const styles = StyleSheet.create({
   activityTitle: {
     fontSize: 14,
     fontWeight: "500",
+    fontFamily: "Montserrat_700Bold",
     marginBottom: 2,
   },
   activityTime: {
     fontSize: 12,
+    fontFamily: "Montserrat_700Bold",
   },
   divider: {
     height: 1,
@@ -793,9 +804,11 @@ const styles = StyleSheet.create({
   predictionTitle: {
     fontSize: 13,
     marginBottom: 4,
+    fontFamily: "Montserrat_700Bold",
   },
   predictionValue: {
     fontSize: 16,
     fontWeight: "700",
+    fontFamily: "Montserrat_700Bold",
   },
 });

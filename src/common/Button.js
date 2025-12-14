@@ -84,7 +84,7 @@ export const Button = ({
             {
               color: getTextColor(),
               fontSize: theme.typography.body.fontSize,
-              fontWeight: "600",
+              fontFamily: "Montserrat_600SemiBold",
             },
           ]}
         >

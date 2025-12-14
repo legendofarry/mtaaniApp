@@ -20,11 +20,6 @@ export default function LogoutSplash() {
     // logout process
     const timer = setTimeout(async () => {
       await logoutAndReset();
-
-      navigation.reset({
-        index: 0,
-        routes: [{ name: "AuthStack" }],
-      });
     }, 1200);
 
     return () => clearTimeout(timer);

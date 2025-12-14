@@ -1,3 +1,4 @@
+// backend\models\User.js
 const mongoose = require("mongoose");
 
 const locationSchema = new mongoose.Schema({
@@ -48,6 +49,13 @@ const userSchema = new mongoose.Schema(
     },
 
     verified: { type: Boolean, default: false },
+
+    // ⭐ NEW: Track onboarding completion
+    onboardingCompleted: { type: Boolean, default: false },
+
+    // ⭐ NEW: Track profile completion fields
+    gender: { type: String, enum: ["male", "female", "other"] },
+    age: { type: Number },
 
     location: locationSchema,
 

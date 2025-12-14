@@ -1,22 +1,24 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { View, StyleSheet, Animated } from "react-native";
 import LottieView from "lottie-react-native";
 import { useNavigation } from "@react-navigation/native";
+import { useAuth } from "../../store/useAuth";
 
 export default function SplashAfterLogin() {
   const navigation = useNavigation();
-  const fade = new Animated.Value(0);
+  const clearPostAuthSplash = useAuth((state) => state.clearPostAuthSplash);
+
+  const fade = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // fade in
     Animated.timing(fade, {
       toValue: 1,
       duration: 500,
       useNativeDriver: true,
     }).start();
 
-    // wait then go to Tabs
     const timer = setTimeout(() => {
+      clearPostAuthSplash(); // ⭐ IMPORTANT
       navigation.reset({
         index: 0,
         routes: [{ name: "Tabs" }],

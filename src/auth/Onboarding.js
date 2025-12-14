@@ -13,26 +13,30 @@ import {
   Alert,
   ActivityIndicator,
   Dimensions,
+  FlatList,
 } from "react-native";
 import { useTheme } from "../common/ThemeProvider";
 import AnimatedBackground from "../common/AnimatedBackground";
 import { Button } from "../common/Button";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import { Camera } from "expo-camera";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_URL, headers } from "../services/api";
+import { search } from "kenya-locations";
+import { useAuth } from "../store/useAuth";
+
+// Only import Camera on mobile
+const Camera = Platform.OS !== "web" ? require("expo-camera").Camera : null;
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 
 export default function Onboarding({ route, navigation }) {
-  // expected route.params: { userId, token }
   const { userId, token: routeToken } = route.params || {};
   const { theme } = useTheme();
 
   // profile fields
   const [phone, setPhone] = useState("");
-  const [gender, setGender] = useState("other"); // male|female|other
+  const [gender, setGender] = useState("other");
   const [age, setAge] = useState("");
   const [location, setLocation] = useState({
     area: "",
@@ -47,18 +51,28 @@ export default function Onboarding({ route, navigation }) {
   });
 
   // avatar state
-  const [avatarLocalUri, setAvatarLocalUri] = useState(null); // local uri
-  const [avatarBase64, setAvatarBase64] = useState(null); // optional base64
+  const [avatarLocalUri, setAvatarLocalUri] = useState(null);
+  const [avatarBase64, setAvatarBase64] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
 
-  // camera state
+  // ⭐ Kenya locations autocomplete
+  const [areaSearch, setAreaSearch] = useState("");
+  const [areaResults, setAreaResults] = useState([]);
+  const [showAreaDropdown, setShowAreaDropdown] = useState(false);
+
+  // camera state (only for mobile)
   const [cameraOpen, setCameraOpen] = useState(false);
   const cameraRef = useRef(null);
   const [hasCameraPermission, setHasCameraPermission] = useState(null);
-  const [flash, setFlash] = useState(Camera.Constants.FlashMode.off);
+  const [flash, setFlash] = useState(
+    Platform.OS !== "web" && Camera ? Camera.Constants.FlashMode.off : "off"
+  );
 
-  // get token: route token or AsyncStorage fallback
   const [token, setToken] = useState(routeToken || null);
+
+  const completeOnboarding = useAuth((state) => state.completeOnboarding);
+
   useEffect(() => {
     if (!token) {
       (async () => {
@@ -68,12 +82,14 @@ export default function Onboarding({ route, navigation }) {
     }
   }, []);
 
-  // request camera permissions on mount
+  // request camera permissions on mount (mobile only)
   useEffect(() => {
-    (async () => {
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      setHasCameraPermission(status === "granted");
-    })();
+    if (Platform.OS !== "web" && Camera) {
+      (async () => {
+        const { status } = await Camera.requestCameraPermissionsAsync();
+        setHasCameraPermission(status === "granted");
+      })();
+    }
   }, []);
 
   // helper: open image gallery
@@ -88,11 +104,11 @@ export default function Onboarding({ route, navigation }) {
         return;
       }
       const pick = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ["images"], // ⭐ Fixed deprecation
         quality: 0.8,
         base64: true,
       });
-      if (!pick.cancelled) {
+      if (!pick.cancelled && !pick.canceled) {
         setAvatarLocalUri(pick.uri);
         setAvatarBase64(
           pick.base64 ? `data:image/jpeg;base64,${pick.base64}` : null
@@ -104,8 +120,15 @@ export default function Onboarding({ route, navigation }) {
     }
   };
 
-  // helper: open camera capture
+  // helper: open camera capture (mobile only)
   const openCamera = () => {
+    if (Platform.OS === "web") {
+      Alert.alert(
+        "Camera unavailable",
+        "Camera is not available on web. Please use gallery."
+      );
+      return;
+    }
     if (hasCameraPermission === false) {
       Alert.alert(
         "Camera permission",
@@ -116,8 +139,9 @@ export default function Onboarding({ route, navigation }) {
     setCameraOpen(true);
   };
 
-  // capture photo (camera UI is an inline simple capture)
+  // capture photo (mobile only)
   const capturePhoto = async () => {
+    if (Platform.OS === "web") return;
     try {
       if (!cameraRef.current) return;
       const photo = await cameraRef.current.takePictureAsync({
@@ -135,81 +159,147 @@ export default function Onboarding({ route, navigation }) {
     }
   };
 
-  // GPS fetching helper (uses expo-location if you add it; fallback omitted)
+  // GPS fetching helper
   const fetchGPS = async () => {
     try {
-      const { status } = await (
-        await import("expo-location")
-      ).requestForegroundPermissionsAsync();
+      const Location = await import("expo-location");
+      const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
         Alert.alert("Location required", "Allow location to auto-fill GPS.");
         return;
       }
-      const pos = await (
-        await import("expo-location")
-      ).getCurrentPositionAsync({
-        accuracy: (await import("expo-location")).Accuracy.Highest,
+      const pos = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Highest,
       });
+
+      // ⭐ Fix: Properly set lat/lng
+      const newGPS = {
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+      };
+
       setLocation((p) => ({
         ...p,
-        gps: { lat: pos.coords.latitude, lng: pos.coords.longitude },
+        gps: newGPS,
       }));
+
+      Alert.alert(
+        "Success",
+        `GPS coordinates saved: ${newGPS.lat.toFixed(4)}, ${newGPS.lng.toFixed(
+          4
+        )}`
+      );
     } catch (err) {
       console.log("GPS error", err);
       Alert.alert("Error", "Could not get GPS. Try again.");
     }
   };
 
-  // determine default avatar asset (local) based on gender
+  // ⭐ Kenya locations search handler
+  const handleAreaSearch = (text) => {
+    setAreaSearch(text);
+    setLocation((p) => ({ ...p, area: text }));
+
+    if (text.length >= 2) {
+      try {
+        const results = search(text);
+        setAreaResults(results.slice(0, 10)); // Limit to 10 results
+        setShowAreaDropdown(true);
+      } catch (err) {
+        console.log("Search error:", err);
+        setAreaResults([]);
+      }
+    } else {
+      setAreaResults([]);
+      setShowAreaDropdown(false);
+    }
+  };
+
+  const selectArea = (result) => {
+    const areaText = `${result.name}, ${result.parent || ""}`.trim();
+    setAreaSearch(areaText);
+    setLocation((p) => ({ ...p, area: areaText }));
+    setShowAreaDropdown(false);
+    setAreaResults([]);
+  };
+
+  // determine default avatar asset
   const getDefaultAvatar = () => {
     if (gender === "male") return require("../../assets/avatars/male.png");
     if (gender === "female") return require("../../assets/avatars/female.png");
-    // other: choose a neutral default (female used as fallback if you supply only two)
     return require("../../assets/avatars/female.png");
   };
 
-  // Validate required fields before submit
+  // Validate required fields
   const validate = () => {
-    if (!phone || phone.length < 7) {
-      Alert.alert("Enter phone", "Please enter a valid phone number.");
+    console.log("🔍 Validating fields...");
+    console.log("Phone:", phone);
+    console.log("Area:", location.area);
+    console.log("Age:", age);
+
+    // ⭐ Phone validation: must start with +254 and be correct length
+    if (!phone || !phone.startsWith("+254")) {
+      const msg = "Phone number must start with +254 (e.g., +254712345678)";
+      setError(msg);
+      Alert.alert("Invalid phone", msg);
       return false;
     }
+
+    // Kenyan phone format: +254 + 9 digits = 13 chars total
+    if (phone.length !== 13) {
+      const msg =
+        "Phone number must be 13 characters (+254 followed by 9 digits)";
+      setError(msg);
+      Alert.alert("Invalid phone", msg);
+      return false;
+    }
+
     if (!location.area || location.area.trim().length < 2) {
-      Alert.alert("Enter area", "Please enter your area (neighborhood).");
+      const msg = "Please enter your area (neighbourhood).";
+      setError(msg);
+      Alert.alert("Enter area", msg);
       return false;
     }
-    if (!age || isNaN(parseInt(age, 10)) || parseInt(age, 10) < 10) {
-      Alert.alert("Enter age", "Please enter a valid age.");
+
+    const ageNum = parseInt(age, 10);
+    if (!age || isNaN(ageNum) || ageNum < 10 || ageNum > 120) {
+      const msg = "Please enter a valid age (10-120).";
+      setError(msg);
+      Alert.alert("Enter age", msg);
       return false;
     }
+
+    setError("");
+    console.log("✅ Validation passed!");
     return true;
   };
 
   // upload / save profile
   const handleSaveProfile = async () => {
+    console.log("🚀 Save profile clicked!");
+    console.log("UserId:", userId);
+    console.log("Token:", token);
+
     if (!validate()) return;
     setUploading(true);
 
     try {
-      // Prepare URL and headers
       const url = `${API_URL}/users/${userId}`;
       const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
 
-      // If we have a local avatar file, try sending multipart/form-data
+      // If we have avatar, upload it
       if (avatarLocalUri) {
-        // Build form data
         const form = new FormData();
         form.append("phone", phone);
         form.append("gender", gender);
         form.append("age", `${age}`);
         form.append("location", JSON.stringify(location));
+        form.append("onboardingCompleted", "true"); // ⭐ Mark as completed
 
-        // On React Native, file needs name & type
         const filename = avatarLocalUri.split("/").pop();
         const match = /\.(\w+)$/.exec(filename || "");
         const filetype = match ? `image/${match[1]}` : "image/jpeg";
 
-        // For Expo-managed apps, fetch the file to get blob (RN can handle direct uri in FormData too)
         let fileToUpload;
         try {
           const response = await fetch(avatarLocalUri);
@@ -218,22 +308,18 @@ export default function Onboarding({ route, navigation }) {
             uri: avatarLocalUri,
             name: filename || `avatar.${match ? match[1] : "jpg"}`,
             type: filetype,
-            // some servers want the blob itself appended, but FormData works with { uri, name, type }
           };
           form.append("avatar", fileToUpload);
         } catch (err) {
           console.log("Form file fetch failed", err);
-          // fallback: append base64 string
           if (avatarBase64) {
             form.append("avatarBase64", avatarBase64);
           }
         }
 
-        // Send multipart
         const res = await fetch(url, {
           method: "PUT",
           headers: {
-            // leave out Content-Type to let fetch set the correct boundary
             ...authHeaders,
             Accept: "application/json",
           },
@@ -249,21 +335,20 @@ export default function Onboarding({ route, navigation }) {
           return;
         }
 
-        // success
         await AsyncStorage.setItem("user", JSON.stringify(resJson.user || {}));
-        // navigate to home
-        navigation.reset &&
-          navigation.reset({ index: 0, routes: [{ name: "HomeTabs" }] });
+        await completeOnboarding();
+        // ❌ DO NOT NAVIGATE
+
         return;
       }
 
-      // If no local avatar selected, use default local asset (we will not upload it)
-      // Instead send a field telling backend to set default avatar based on gender.
+      // No avatar - use default
       const payload = {
         phone,
         gender,
         age: parseInt(age, 10),
         location,
+        onboardingCompleted: true, // ⭐ Mark as completed
         useDefaultAvatar: true,
         defaultAvatarGender:
           gender === "male"
@@ -291,13 +376,9 @@ export default function Onboarding({ route, navigation }) {
         return;
       }
 
-      // success
       await AsyncStorage.setItem("user", JSON.stringify(json2.user || {}));
-      navigation.reset &&
-        navigation.reset({
-          index: 0,
-          routes: [{ name: "Tabs", params: { transition: "fade" } }],
-        });
+      await completeOnboarding();
+      // ❌ DO NOT NAVIGATE
     } catch (err) {
       setUploading(false);
       console.log("Save profile error", err);
@@ -305,7 +386,6 @@ export default function Onboarding({ route, navigation }) {
     }
   };
 
-  // UI
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -323,9 +403,7 @@ export default function Onboarding({ route, navigation }) {
           </Text>
 
           <Text style={[styles.hint, { color: theme.colors.textSecondary }]}>
-            Tell us a bit more to personalize your experience. Choosing Male or
-            Female helps us pick a default avatar — if you prefer not to say,
-            choose Other.
+            Tell us a bit more to personalize your experience.
           </Text>
 
           {/* Selfie / Avatar */}
@@ -342,8 +420,12 @@ export default function Onboarding({ route, navigation }) {
             </View>
 
             <View style={{ flex: 1, marginLeft: 12 }}>
-              <Button title="Take selfie" onPress={openCamera} />
-              <View style={{ height: 10 }} />
+              {Platform.OS !== "web" && (
+                <>
+                  <Button title="Take selfie" onPress={openCamera} />
+                  <View style={{ height: 10 }} />
+                </>
+              )}
               <Button
                 title="Choose from gallery"
                 variant="secondary"
@@ -369,43 +451,46 @@ export default function Onboarding({ route, navigation }) {
             </View>
           </View>
 
-          {/* Camera inline modal-ish view */}
-          {cameraOpen && hasCameraPermission && (
-            <View style={styles.cameraContainer}>
-              <Camera
-                style={styles.cameraPreview}
-                type={Camera.Constants.Type.front}
-                flashMode={flash}
-                ref={cameraRef}
-              >
-                <View style={styles.cameraTop}>
-                  <TouchableOpacity
-                    onPress={() =>
-                      setFlash((f) =>
-                        f === Camera.Constants.FlashMode.off
-                          ? Camera.Constants.FlashMode.torch
-                          : Camera.Constants.FlashMode.off
-                      )
-                    }
-                  >
-                    <Ionicons name="flash" size={28} color="#fff" />
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => setCameraOpen(false)}>
-                    <Ionicons name="close" size={28} color="#fff" />
-                  </TouchableOpacity>
-                </View>
+          {/* Camera inline (mobile only) */}
+          {Platform.OS !== "web" &&
+            cameraOpen &&
+            hasCameraPermission &&
+            Camera && (
+              <View style={styles.cameraContainer}>
+                <Camera
+                  style={styles.cameraPreview}
+                  type={Camera.Constants.Type.front}
+                  flashMode={flash}
+                  ref={cameraRef}
+                >
+                  <View style={styles.cameraTop}>
+                    <TouchableOpacity
+                      onPress={() =>
+                        setFlash((f) =>
+                          f === Camera.Constants.FlashMode.off
+                            ? Camera.Constants.FlashMode.torch
+                            : Camera.Constants.FlashMode.off
+                        )
+                      }
+                    >
+                      <Ionicons name="flash" size={28} color="#fff" />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => setCameraOpen(false)}>
+                      <Ionicons name="close" size={28} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
 
-                <View style={styles.cameraBottom}>
-                  <TouchableOpacity
-                    onPress={capturePhoto}
-                    style={styles.captureButton}
-                  >
-                    <View style={styles.captureInner} />
-                  </TouchableOpacity>
-                </View>
-              </Camera>
-            </View>
-          )}
+                  <View style={styles.cameraBottom}>
+                    <TouchableOpacity
+                      onPress={capturePhoto}
+                      style={styles.captureButton}
+                    >
+                      <View style={styles.captureInner} />
+                    </TouchableOpacity>
+                  </View>
+                </Camera>
+              </View>
+            )}
 
           {/* Phone */}
           <Text style={[styles.label, { color: theme.colors.textSecondary }]}>
@@ -418,7 +503,7 @@ export default function Onboarding({ route, navigation }) {
               color={theme.colors.textSecondary}
             />
             <TextInput
-              placeholder="Phone number"
+              placeholder="+254...."
               placeholderTextColor={theme.colors.textDisabled}
               style={[styles.input, { color: theme.colors.textPrimary }]}
               keyboardType="phone-pad"
@@ -479,7 +564,7 @@ export default function Onboarding({ route, navigation }) {
                   gender === "other" && styles.genderTextActive,
                 ]}
               >
-                Other / Prefer not to say
+                Other
               </Text>
             </TouchableOpacity>
           </View>
@@ -495,7 +580,7 @@ export default function Onboarding({ route, navigation }) {
               color={theme.colors.textSecondary}
             />
             <TextInput
-              placeholder="Age"
+              placeholder=""
               placeholderTextColor={theme.colors.textDisabled}
               style={[styles.input, { color: theme.colors.textPrimary }]}
               keyboardType="number-pad"
@@ -504,23 +589,55 @@ export default function Onboarding({ route, navigation }) {
             />
           </View>
 
-          {/* Location area (required) */}
+          {/* Location area with autocomplete */}
           <Text style={[styles.label, { color: theme.colors.textSecondary }]}>
             Area (neighbourhood)
           </Text>
-          <View style={styles.inputRow}>
-            <Ionicons
-              name="location-outline"
-              size={20}
-              color={theme.colors.textSecondary}
-            />
-            <TextInput
-              placeholder="Area (e.g., Kayole Soweto)"
-              placeholderTextColor={theme.colors.textDisabled}
-              style={[styles.input, { color: theme.colors.textPrimary }]}
-              value={location.area}
-              onChangeText={(t) => setLocation((p) => ({ ...p, area: t }))}
-            />
+          <View style={{ position: "relative" }}>
+            <View style={styles.inputRow}>
+              <Ionicons
+                name="location-outline"
+                size={20}
+                color={theme.colors.primary}
+              />
+              <TextInput
+                placeholder=""
+                placeholderTextColor={theme.colors.textDisabled}
+                style={[styles.input, { color: theme.colors.textPrimary }]}
+                value={areaSearch}
+                onChangeText={handleAreaSearch}
+                onFocus={() =>
+                  areaSearch.length >= 2 && setShowAreaDropdown(true)
+                }
+              />
+            </View>
+
+            {/* ⭐ Dropdown results */}
+            {showAreaDropdown && areaResults.length > 0 && (
+              <View style={styles.dropdown}>
+                <FlatList
+                  data={areaResults}
+                  keyExtractor={(item, index) => `${item.name}-${index}`}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={styles.dropdownItem}
+                      onPress={() => selectArea(item)}
+                    >
+                      <Ionicons name="location" size={16} color="#6b7280" />
+                      <View style={{ marginLeft: 8 }}>
+                        <Text style={styles.dropdownName}>{item.name}</Text>
+                        {item.parent && (
+                          <Text style={styles.dropdownParent}>
+                            {item.parent}
+                          </Text>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  )}
+                  style={{ maxHeight: 200 }}
+                />
+              </View>
+            )}
           </View>
 
           {/* Optional address details */}
@@ -534,7 +651,7 @@ export default function Onboarding({ route, navigation }) {
               color={theme.colors.textSecondary}
             />
             <TextInput
-              placeholder="Estate or apartment name"
+              placeholder=""
               placeholderTextColor={theme.colors.textDisabled}
               style={[styles.input, { color: theme.colors.textPrimary }]}
               value={location.estate}
@@ -551,7 +668,7 @@ export default function Onboarding({ route, navigation }) {
               </Text>
               <View style={styles.inputRow}>
                 <TextInput
-                  placeholder="Block"
+                  placeholder=""
                   placeholderTextColor={theme.colors.textDisabled}
                   style={[styles.input, { color: theme.colors.textPrimary }]}
                   value={location.block}
@@ -563,11 +680,11 @@ export default function Onboarding({ route, navigation }) {
               <Text
                 style={[styles.label, { color: theme.colors.textSecondary }]}
               >
-                House / Apt No
+                House No
               </Text>
               <View style={styles.inputRow}>
                 <TextInput
-                  placeholder="House/Apt No"
+                  placeholder="House Label"
                   placeholderTextColor={theme.colors.textDisabled}
                   style={[styles.input, { color: theme.colors.textPrimary }]}
                   value={location.houseNumber}
@@ -580,7 +697,7 @@ export default function Onboarding({ route, navigation }) {
           </View>
 
           <Text style={[styles.label, { color: theme.colors.textSecondary }]}>
-            Landmark (optional)
+            Landmark
           </Text>
           <View style={styles.inputRow}>
             <Ionicons
@@ -589,7 +706,7 @@ export default function Onboarding({ route, navigation }) {
               color={theme.colors.textSecondary}
             />
             <TextInput
-              placeholder="Landmark"
+              placeholder="optional"
               placeholderTextColor={theme.colors.textDisabled}
               style={[styles.input, { color: theme.colors.textPrimary }]}
               value={location.landmark}
@@ -603,6 +720,20 @@ export default function Onboarding({ route, navigation }) {
 
           <View style={{ height: 14 }} />
 
+          {/* ⭐ Error message */}
+          {error ? (
+            <View
+              style={{
+                backgroundColor: "#fee2e2",
+                padding: 12,
+                borderRadius: 8,
+                marginBottom: 12,
+              }}
+            >
+              <Text style={{ color: "#dc2626", fontSize: 14 }}>{error}</Text>
+            </View>
+          ) : null}
+
           {uploading ? (
             <View style={{ alignItems: "center" }}>
               <ActivityIndicator size="large" color={theme.colors.primary} />
@@ -613,7 +744,11 @@ export default function Onboarding({ route, navigation }) {
               </Text>
             </View>
           ) : (
-            <Button title="Finish & Go to Home" onPress={handleSaveProfile} />
+            <Button
+              title="Finish & Go to Home"
+              onPress={handleSaveProfile}
+              disabled={uploading}
+            />
           )}
 
           <View style={{ height: 28 }} />
@@ -638,7 +773,7 @@ const styles = StyleSheet.create({
   avatarPreview: {
     width: 110,
     height: 110,
-    borderRadius: 110 / 2,
+    borderRadius: 55,
     overflow: "hidden",
     backgroundColor: "#F3F4F6",
     justifyContent: "center",
@@ -706,7 +841,7 @@ const styles = StyleSheet.create({
   captureButton: {
     width: 78,
     height: 78,
-    borderRadius: 78 / 2,
+    borderRadius: 39,
     borderWidth: 6,
     borderColor: "rgba(255,255,255,0.9)",
     justifyContent: "center",

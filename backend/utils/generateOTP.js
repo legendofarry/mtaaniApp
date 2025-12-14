@@ -1,11 +1,19 @@
-// backend/utils/saveOtp.js
-const Otp = require("../models/Otp");
+// backend/utils/generateOTP.js
 
-async function saveOtp(email, code, purpose = "verify", ttlSeconds = 300) {
-  const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
-  const otpDoc = new Otp({ email, code, purpose, expiresAt, used: false });
-  await otpDoc.save();
-  return otpDoc;
+/**
+ * Generate a random numeric OTP
+ * @param {number} length - Number of digits (default 6)
+ * @returns {string} - OTP code as a string
+ */
+function generateOTP(length = 6) {
+  const digits = "0123456789";
+  let otp = "";
+
+  for (let i = 0; i < length; i++) {
+    otp += digits[Math.floor(Math.random() * 10)];
+  }
+
+  return otp;
 }
 
-module.exports = saveOtp;
+module.exports = generateOTP;

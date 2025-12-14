@@ -25,7 +25,7 @@ export default function OTP({ route, navigation }) {
   const [loading, setLoading] = useState(false);
   const inputs = useRef([]);
 
-  // If devOtp provided (returned in dev mode), auto-fill for convenience
+  // If devOtp provided, auto-fill for convenience
   useEffect(() => {
     if (__DEV__ && devOtp) {
       const devDigits = devOtp.slice(0, 6).split("");
@@ -43,7 +43,6 @@ export default function OTP({ route, navigation }) {
 
   // handle text change for single digit input
   const handleChange = (text, i) => {
-    // accept only digits
     const digit = text.replace(/[^\d]/g, "").slice(-1);
     const next = [...otpArr];
     next[i] = digit;
@@ -51,10 +50,6 @@ export default function OTP({ route, navigation }) {
 
     if (digit && i < 5) {
       inputs.current[i + 1]?.focus();
-    }
-    if (!digit && i > 0) {
-      // if user cleared box, focus previous (optional)
-      // inputs.current[i - 1]?.focus();
     }
   };
 
@@ -77,19 +72,28 @@ export default function OTP({ route, navigation }) {
       const data = await res.json();
       setLoading(false);
 
+      console.log("📥 OTP Verify response:", data);
+
       if (!res.ok) {
         Alert.alert("Verification failed", data?.message || "Invalid OTP");
         return;
       }
 
-      // store token and navigate to onboarding
+      // Store token and user
       if (data?.accessToken) {
         await AsyncStorage.setItem("token", data.accessToken);
       }
-      // pass user id (backend returns user id too); prefer returned user id
-      const returnedUserId = data?.user?.id || userId;
+      if (data?.user) {
+        await AsyncStorage.setItem("user", JSON.stringify(data.user));
+      }
+
+      // Get userId from response (multiple fallbacks)
+      const verifiedUserId = data?.userId || data?.user?.id || userId;
+
+      console.log("✅ Navigating to Onboarding with userId:", verifiedUserId);
+
       navigation.replace("Onboarding", {
-        userId: returnedUserId,
+        userId: verifiedUserId,
         token: data.accessToken,
       });
     } catch (err) {
@@ -116,7 +120,6 @@ export default function OTP({ route, navigation }) {
         return;
       }
 
-      // restart timer
       setTimer(30);
 
       if (__DEV__ && data?.otp) {

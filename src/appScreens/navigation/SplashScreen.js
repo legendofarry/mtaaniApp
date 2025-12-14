@@ -23,7 +23,6 @@ export default function SplashScreen() {
           loop
           style={{ width: 200, height: 200 }}
         />
-        <Text style={styles.appName}>MtaaniFlow</Text>
       </Animated.View>
     </View>
   );

@@ -1,30 +1,41 @@
-// src\appScreens\Routes.js
-import React, { useEffect, useState } from "react";
+import React from "react";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
+
 import AuthStack from "./navigation/AuthStack";
 import MainStack from "./navigation/MainStack";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import SplashScreen from "./navigation/SplashScreen";
+import Onboarding from "../auth/Onboarding";
+
+import { useAuth } from "../store/useAuth";
+
+const Stack = createNativeStackNavigator();
 
 export default function Routes() {
-  const [loading, setLoading] = useState(true);
-  const [loggedIn, setLoggedIn] = useState(false);
+  const { token, user, isRestored } = useAuth();
 
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const token = await AsyncStorage.getItem("token");
-        setLoggedIn(!!token);
-      } catch (err) {
-        setLoggedIn(false);
-      }
-      setLoading(false);
-    };
-    checkAuth();
-  }, []);
-
-  if (loading) {
+  // Still restoring storage
+  if (!isRestored) {
     return <SplashScreen />;
   }
 
-  return loggedIn ? <MainStack /> : <AuthStack />;
+  // Not logged in
+  if (!token) {
+    return <AuthStack />;
+  }
+
+  // Logged in but not onboarded
+  if (user && user.onboardingCompleted !== true) {
+    return (
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen
+          name="Onboarding"
+          component={Onboarding}
+          options={{ gestureEnabled: false }}
+        />
+      </Stack.Navigator>
+    );
+  }
+
+  // Logged in + onboarded
+  return <MainStack />;
 }

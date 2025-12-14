@@ -1,43 +1,35 @@
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+
 import BottomTabs from "./BottomTabs";
-import AuthStack from "./AuthStack";
 import SplashAfterLogin from "./SplashAfterLogin";
-import LogoutSplash from "./LogoutSplash";
+import { useAuth } from "../../store/useAuth";
+
+import EditProfileWizard from "../../profile/EditProfileWizard";
+import EditEmail from "../../profile/EditEmail";
+import MyMeters from "../../profile/MyMeters";
+import LinkMeter from "../../profile/LinkMeter";
+import MeterDetails from "../../profile/MeterDetails";
 
 const Stack = createNativeStackNavigator();
 
 export default function MainStack() {
+  const shouldShowSplash = useAuth((state) => state.shouldShowPostAuthSplash);
+
   return (
-    <Stack.Navigator
-      screenOptions={({ route }) => {
-        const transition = route.params?.transition;
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      {/* Post-auth splash */}
+      <Stack.Screen name="SplashAfterLogin" component={SplashAfterLogin} />
 
-        return {
-          headerShown: false,
-          animation: transition === "fade" ? "fade" : "slide_from_right",
-        };
-      }}
-    >
-      <Stack.Screen
-        name="SplashAfterLogin"
-        component={SplashAfterLogin}
-        options={{ headerShown: false }}
-      />
+      {/* Profile flows */}
+      <Stack.Screen name="EditProfileWizard" component={EditProfileWizard} />
+      <Stack.Screen name="EditEmail" component={EditEmail} />
+      <Stack.Screen name="MyMeters" component={MyMeters} />
+      <Stack.Screen name="LinkMeter" component={LinkMeter} />
+      <Stack.Screen name="MeterDetails" component={MeterDetails} />
 
-      <Stack.Screen
-        name="LogoutSplash"
-        component={LogoutSplash}
-        options={{ headerShown: false }}
-      />
-
+      {/* Main tabs (navigator MUST be inside Screen) */}
       <Stack.Screen name="Tabs" component={BottomTabs} />
-
-      <Stack.Screen
-        name="AuthStack"
-        component={AuthStack}
-        options={{ headerShown: false }}
-      />
     </Stack.Navigator>
   );
 }

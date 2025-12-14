@@ -13,11 +13,41 @@ const Theme = (mode = "light") => {
     radius: { sm: 6, md: 10, lg: 16, pill: 50 },
 
     typography: {
-      h1: { fontSize: 32, fontWeight: "700" },
-      h2: { fontSize: 24, fontWeight: "700" },
-      h3: { fontSize: 20, fontWeight: "600" },
-      body: { fontSize: 16, fontWeight: "400" },
-      caption: { fontSize: 13, fontWeight: "400" },
+      h1: {
+        fontSize: 32,
+        fontWeight: "700",
+        fontFamily: "Montserrat_700Bold",
+      },
+      h2: {
+        fontSize: 24,
+        fontWeight: "700",
+        fontFamily: "Montserrat_700Bold",
+      },
+      h3: {
+        fontSize: 20,
+        fontWeight: "600",
+        fontFamily: "Montserrat_600SemiBold",
+      },
+      body: {
+        fontSize: 16,
+        fontWeight: "400",
+        fontFamily: "Montserrat_400Regular",
+      },
+      caption: {
+        fontSize: 13,
+        fontWeight: "400",
+        fontFamily: "Montserrat_400Regular",
+      },
+      bodyMedium: {
+        fontSize: 16,
+        fontWeight: "500",
+        fontFamily: "Montserrat_500Medium",
+      },
+      bodySemiBold: {
+        fontSize: 16,
+        fontWeight: "600",
+        fontFamily: "Montserrat_600SemiBold",
+      },
     },
 
     iconSizes: { sm: 16, md: 20, lg: 26, xl: 32 },

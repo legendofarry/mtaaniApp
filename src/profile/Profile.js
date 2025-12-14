@@ -1,5 +1,5 @@
 // src/profile/Profile.js
-import React, { useRef } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,189 +7,543 @@ import {
   TouchableOpacity,
   StyleSheet,
   Animated,
-  Switch,
+  ScrollView,
+  Alert,
+  Platform,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useTheme } from "../common/ThemeProvider";
-import { useAuth } from "../store/useAuth"; // Zustand store
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useAuth } from "../store/useAuth";
+import Modal from "../common/Modal";
 
 export default function Profile() {
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
   const { theme } = useTheme();
   const navigation = useNavigation();
-  const { logoutAndReset } = useAuth(); // Zustand clear function
+  const [user, setUser] = useState(null);
   const opacity = useRef(new Animated.Value(1)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const logoutAndReset = useAuth((state) => state.logoutAndReset);
+  const isPremium = user?.subscription === "premium";
 
-  // Fade-out animation
+  useEffect(() => {
+    loadUser();
+    animateIn();
+  }, []);
+
+  const loadUser = async () => {
+    try {
+      const userData = await AsyncStorage.getItem("user");
+      if (userData) {
+        setUser(JSON.parse(userData));
+      }
+    } catch (err) {
+      console.log("Error loading user:", err);
+    }
+  };
+
+  const animateIn = () => {
+    Animated.spring(slideAnim, {
+      toValue: 1,
+      tension: 50,
+      friction: 8,
+      useNativeDriver: true,
+    }).start();
+  };
+
   const fadeOut = () => {
     return new Promise((resolve) => {
       Animated.timing(opacity, {
         toValue: 0,
-        duration: 450,
+        duration: 400,
         useNativeDriver: true,
       }).start(() => resolve());
     });
   };
 
+  const performLogout = async () => {
+    console.log("performLogout fired");
+    await fadeOut();
+    await logoutAndReset();
+  };
+
+  const confirmAndLogout = () => {
+    setTimeout(() => {
+      performLogout();
+    }, 0);
+  };
+
+  const cancelLogout = () => {
+    setShowLogoutModal(false);
+  };
+
+  const confirmLogout = () => {
+    setShowLogoutModal(false);
+    confirmAndLogout();
+  };
+
+  const handleLogout = () => {
+    setShowLogoutModal(true);
+  };
+
+  const getInitials = () => {
+    if (!user?.fullName) return "U";
+    const names = user.fullName.split(" ");
+    if (names.length >= 2) {
+      return names[0].charAt(0) + names[1].charAt(0);
+    }
+    return names[0].charAt(0);
+  };
+
+  const AnimatedCard = ({ children, delay = 0 }) => {
+    const cardAnim = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+      Animated.timing(cardAnim, {
+        toValue: 1,
+        duration: 400,
+        delay,
+        useNativeDriver: true,
+      }).start();
+    }, []);
+
+    return (
+      <Animated.View
+        style={{
+          opacity: cardAnim,
+          transform: [
+            {
+              translateY: cardAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [20, 0],
+              }),
+            },
+          ],
+        }}
+      >
+        {children}
+      </Animated.View>
+    );
+  };
+
   return (
-    <Animated.View style={{ flex: 1, opacity }}>
-      <Animated.ScrollView
+    <Animated.View style={[styles.container, { opacity }]}>
+      <ScrollView
         style={{ flex: 1, backgroundColor: theme.colors.background }}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 30 }}
       >
-        {/* Header */}
+        {/* Header with Gradient */}
         <LinearGradient
           colors={["#667eea", "#764ba2"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.headerGradient}
         >
-          <View style={styles.headerContent}>
-            <View style={styles.profileImageContainer}>
-              <Image
-                source={{
-                  uri: "https://api.dicebear.com/7.x/avataaars/svg?seed=profile",
-                }}
-                style={styles.profileImage}
-              />
-              <View style={styles.onlineIndicator} />
-              <TouchableOpacity style={styles.editPhotoButton}>
-                <Ionicons name="camera" size={16} color="#FFF" />
-              </TouchableOpacity>
-            </View>
+          <Animated.View
+            style={[
+              styles.headerContent,
+              {
+                opacity: slideAnim,
+                transform: [
+                  {
+                    translateY: slideAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-20, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <TouchableOpacity
+              style={styles.profileImageContainer}
+              onPress={() => navigation.navigate("EditProfile")}
+            >
+              {user?.profileImageUrl ? (
+                <Image
+                  source={{ uri: user.profileImageUrl }}
+                  style={styles.profileImage}
+                />
+              ) : (
+                <View style={[styles.profileImage, styles.profilePlaceholder]}>
+                  <Text style={styles.profileInitials}>{getInitials()}</Text>
+                </View>
+              )}
+              <View style={styles.editPhotoButton}>
+                <Ionicons name="camera" size={14} color="#FFF" />
+              </View>
+            </TouchableOpacity>
 
-            <Text style={styles.userName}>Alex Morgan</Text>
-            <Text style={styles.userEmail}>alex.morgan@example.com</Text>
+            <Text style={styles.userName}>{user?.fullName || "User"}</Text>
 
-            <View style={styles.membershipBadge}>
-              <Ionicons name="diamond" size={12} color="#FFD700" />
-              <Text style={styles.membershipText}>Premium Member</Text>
-            </View>
-          </View>
+            {user?.location?.area && (
+              <View style={styles.locationBadge}>
+                <Ionicons name="location" size={12} color="#FFF" />
+                <Text style={styles.locationText}>{user.location.area}</Text>
+              </View>
+            )}
+          </Animated.View>
         </LinearGradient>
 
-        {/* Stats */}
+        {/* Stats Cards */}
         <View style={styles.statsContainer}>
-          <Animated.View style={styles.statCard}>
-            <View
-              style={[
-                styles.statIconContainer,
-                { backgroundColor: "rgba(59, 130, 246, 0.1)" },
-              ]}
-            >
-              <Ionicons name="time" size={24} color="#3b82f6" />
-            </View>
-            <Text style={styles.statNumber}>24</Text>
-            <Text style={styles.statLabel}>In Progress</Text>
-          </Animated.View>
+          <AnimatedCard delay={100}>
+            <View style={styles.statCard}>
+              <LinearGradient
+                colors={
+                  isPremium
+                    ? ["#FFD700", "#ec0606ff", "#FFC107"]
+                    : ["#9ca3af", "#6b7280"]
+                }
+                style={styles.statIconContainer}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <Ionicons
+                  name={isPremium ? "diamond" : "ribbon-outline"}
+                  size={22}
+                  color="#FFFFFF"
+                />
+              </LinearGradient>
 
-          <Animated.View style={styles.statCard}>
-            <View
-              style={[
-                styles.statIconContainer,
-                { backgroundColor: "rgba(234, 179, 8, 0.1)" },
-              ]}
-            >
-              <Ionicons name="star" size={24} color="#eab308" />
+              {/* PREMIUM TEXT */}
+              {isPremium && (
+                <Text style={[styles.statNumber, styles.premiumText]}>
+                  PREMIUM
+                </Text>
+              )}
+
+              {/* FREE USER → UPGRADE BUTTON */}
+              {!isPremium && (
+                <TouchableOpacity
+                  style={styles.upgradeButton}
+                  onPress={() => {}}
+                  activeOpacity={0.8}
+                >
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <Ionicons
+                      name="sparkles"
+                      size={16}
+                      color="#FFD700"
+                      style={{ marginRight: 6 }}
+                    />
+                    <Text style={styles.upgradeText}>Upgrade</Text>
+                  </View>
+                </TouchableOpacity>
+              )}
             </View>
-            <Text style={styles.statNumber}>4.9</Text>
-            <Text style={styles.statLabel}>Rating</Text>
-          </Animated.View>
+          </AnimatedCard>
+
+          <AnimatedCard delay={150}>
+            <View style={styles.statCard}>
+              <LinearGradient
+                colors={["#eab308", "#ca8a04"]}
+                style={styles.statIconContainer}
+              >
+                <Ionicons name="star" size={20} color="#FFF" />
+              </LinearGradient>
+              <Text style={styles.statNumber}>4.9</Text>
+              <Text style={styles.statLabel}>Rating</Text>
+            </View>
+          </AnimatedCard>
         </View>
 
         {/* Quick Actions */}
-        <View style={styles.section}>
-          <Text
-            style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}
-          >
-            Quick Actions
-          </Text>
+        <AnimatedCard delay={200}>
+          <View style={styles.section}>
+            <Text
+              style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}
+            >
+              Account
+            </Text>
 
-          <View style={styles.quickActionsGrid}>
-            <TouchableOpacity style={styles.actionCard}>
-              <View
-                style={[
-                  styles.actionIcon,
-                  { backgroundColor: "rgba(139, 92, 246, 0.1)" },
-                ]}
-              >
-                <Ionicons name="settings" size={22} color="#8b5cf6" />
+            <TouchableOpacity
+              style={[
+                styles.menuItem,
+                { backgroundColor: theme.colors.surface },
+              ]}
+              onPress={() => navigation.navigate("EditProfileWizard")}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.menuIcon, { backgroundColor: "#8b5cf615" }]}>
+                <Ionicons name="person" size={20} color="#8b5cf6" />
               </View>
-              <Text style={styles.actionText}>Settings</Text>
+              <Text
+                style={[styles.menuText, { color: theme.colors.textPrimary }]}
+              >
+                Edit Profile
+              </Text>
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={theme.colors.textDisabled}
+              />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionCard}>
-              <View
-                style={[
-                  styles.actionIcon,
-                  { backgroundColor: "rgba(14, 165, 233, 0.1)" },
-                ]}
-              >
-                <Ionicons name="shield-checkmark" size={22} color="#0ea5e9" />
+            <TouchableOpacity
+              style={[
+                styles.menuItem,
+                { backgroundColor: theme.colors.surface },
+              ]}
+              onPress={() => navigation.navigate("MyMeters")}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.menuIcon, { backgroundColor: "#3b82f615" }]}>
+                <Ionicons name="speedometer" size={20} color="#3b82f6" />
               </View>
-              <Text style={styles.actionText}>Security</Text>
+              <Text
+                style={[styles.menuText, { color: theme.colors.textPrimary }]}
+              >
+                My Meters
+              </Text>
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={theme.colors.textDisabled}
+              />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionCard}>
-              <View
-                style={[
-                  styles.actionIcon,
-                  { backgroundColor: "rgba(236, 72, 153, 0.1)" },
-                ]}
-              >
-                <Ionicons name="notifications" size={22} color="#ec4899" />
+            <TouchableOpacity
+              style={[
+                styles.menuItem,
+                { backgroundColor: theme.colors.surface },
+              ]}
+              onPress={() => navigation.navigate("Subscription")}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.menuIcon, { backgroundColor: "#3b82f615" }]}>
+                <Ionicons name="ribbon" size={20} color="#ff0000ff" />
               </View>
-              <Text style={styles.actionText}>Notifications</Text>
+              <Text
+                style={[styles.menuText, { color: theme.colors.textPrimary }]}
+              >
+                Subscription
+              </Text>
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={theme.colors.textDisabled}
+              />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionCard}>
-              <View
-                style={[
-                  styles.actionIcon,
-                  { backgroundColor: "rgba(34, 197, 94, 0.1)" },
-                ]}
-              >
-                <Ionicons name="help-circle" size={22} color="#22c55e" />
+            <TouchableOpacity
+              style={[
+                styles.menuItem,
+                { backgroundColor: theme.colors.surface },
+              ]}
+              onPress={() => navigation.navigate("MyReports")}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.menuIcon, { backgroundColor: "#3b82f615" }]}>
+                <Ionicons name="flag" size={20} color="#bb00ffff" />
               </View>
-              <Text style={styles.actionText}>Help</Text>
+              <Text
+                style={[styles.menuText, { color: theme.colors.textPrimary }]}
+              >
+                My Reports
+              </Text>
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={theme.colors.textDisabled}
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.menuItem,
+                { backgroundColor: theme.colors.surface },
+              ]}
+              onPress={() => navigation.navigate("TransactionHistory")}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.menuIcon, { backgroundColor: "#10b98115" }]}>
+                <Ionicons name="receipt" size={20} color="#10b981" />
+              </View>
+              <Text
+                style={[styles.menuText, { color: theme.colors.textPrimary }]}
+              >
+                Transaction History
+              </Text>
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={theme.colors.textDisabled}
+              />
             </TouchableOpacity>
           </View>
-        </View>
+        </AnimatedCard>
 
-        {/* Logout */}
-        <TouchableOpacity
-          style={styles.logoutButton}
-          onPress={async () => {
-            await fadeOut();
-            await fadeOut();
-            navigation.replace("LogoutSplash");
-          }}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="log-out-outline" size={22} color="#ef4444" />
-          <Text style={styles.logoutText}>Sign Out</Text>
-        </TouchableOpacity>
+        {/* Settings */}
+        <AnimatedCard delay={250}>
+          <View style={styles.section}>
+            <Text
+              style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}
+            >
+              Settings
+            </Text>
 
-        <Text style={styles.versionText}>Version 1.0.0 • © 2025</Text>
-      </Animated.ScrollView>
+            <TouchableOpacity
+              style={[
+                styles.menuItem,
+                { backgroundColor: theme.colors.surface },
+              ]}
+              onPress={() => navigation.navigate("Notifications")}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.menuIcon, { backgroundColor: "#ec489915" }]}>
+                <Ionicons name="notifications" size={20} color="#ec4899" />
+              </View>
+              <Text
+                style={[styles.menuText, { color: theme.colors.textPrimary }]}
+              >
+                Notifications
+              </Text>
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={theme.colors.textDisabled}
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.menuItem,
+                { backgroundColor: theme.colors.surface },
+              ]}
+              onPress={() => navigation.navigate("Security")}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.menuIcon, { backgroundColor: "#0ea5e915" }]}>
+                <Ionicons name="shield-checkmark" size={20} color="#0ea5e9" />
+              </View>
+              <Text
+                style={[styles.menuText, { color: theme.colors.textPrimary }]}
+              >
+                Security
+              </Text>
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={theme.colors.textDisabled}
+              />
+            </TouchableOpacity>
+          </View>
+        </AnimatedCard>
+
+        {/* Support */}
+        <AnimatedCard delay={300}>
+          <View style={styles.section}>
+            <Text
+              style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}
+            >
+              Support
+            </Text>
+
+            <TouchableOpacity
+              style={[
+                styles.menuItem,
+                { backgroundColor: theme.colors.surface },
+              ]}
+              onPress={() => navigation.navigate("Help")}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.menuIcon, { backgroundColor: "#22c55e15" }]}>
+                <Ionicons name="help-circle" size={20} color="#22c55e" />
+              </View>
+              <Text
+                style={[styles.menuText, { color: theme.colors.textPrimary }]}
+              >
+                Help & Support
+              </Text>
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={theme.colors.textDisabled}
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.menuItem,
+                { backgroundColor: theme.colors.surface },
+              ]}
+              onPress={() => navigation.navigate("About")}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.menuIcon, { backgroundColor: "#6366f115" }]}>
+                <Ionicons name="information-circle" size={20} color="#6366f1" />
+              </View>
+              <Text
+                style={[styles.menuText, { color: theme.colors.textPrimary }]}
+              >
+                About
+              </Text>
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={theme.colors.textDisabled}
+              />
+            </TouchableOpacity>
+          </View>
+        </AnimatedCard>
+
+        {/* Logout Button */}
+        <AnimatedCard delay={350}>
+          <TouchableOpacity
+            style={styles.logoutButton}
+            onPress={handleLogout}
+            activeOpacity={0.7}
+          >
+            <LinearGradient
+              colors={["#ef4444", "#dc2626"]}
+              style={styles.logoutGradient}
+            >
+              <Ionicons name="log-out-outline" size={20} color="#FFF" />
+              <Text style={styles.logoutText}>Sign Out</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </AnimatedCard>
+
+        <Text style={styles.versionText}>
+          Version 1.0.0 • © 2025 MtaaniFlow
+        </Text>
+      </ScrollView>
+
+      <Modal
+        visible={showLogoutModal}
+        title="Sign Out"
+        message="Are you sure you want to sign out?"
+        cancelText="Cancel"
+        confirmText="Sign Out"
+        onCancel={cancelLogout}
+        onConfirm={confirmLogout}
+      />
     </Animated.View>
   );
 }
 
-// ==============================
-//          STYLES
-// ==============================
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   headerGradient: {
-    paddingTop: 60,
+    paddingTop: 10,
     paddingBottom: 40,
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
   },
-  headerContent: { alignItems: "center" },
-  profileImageContainer: { position: "relative", marginBottom: 16 },
+  headerContent: {
+    alignItems: "center",
+  },
+  profileImageContainer: {
+    position: "relative",
+    marginBottom: 10,
+  },
   profileImage: {
     width: 100,
     height: 100,
@@ -197,16 +551,16 @@ const styles = StyleSheet.create({
     borderWidth: 4,
     borderColor: "rgba(255, 255, 255, 0.3)",
   },
-  onlineIndicator: {
-    position: "absolute",
-    bottom: 6,
-    right: 6,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: "#22c55e",
-    borderWidth: 2,
-    borderColor: "#FFFFFF",
+  profilePlaceholder: {
+    backgroundColor: "#fff",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  profileInitials: {
+    fontSize: 36,
+    fontWeight: "700",
+    color: "#667eea",
+    fontFamily: "Montserrat_700Bold",
   },
   editPhotoButton: {
     position: "absolute",
@@ -226,13 +580,21 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#FFFFFF",
     marginBottom: 4,
+    fontFamily: "Montserrat_700Bold",
   },
   userEmail: {
     fontSize: 14,
     color: "rgba(255, 255, 255, 0.8)",
-    marginBottom: 12,
+    marginBottom: 4,
+    fontFamily: "Montserrat_700Bold",
   },
-  membershipBadge: {
+  userPhone: {
+    fontSize: 13,
+    color: "rgba(255, 255, 255, 0.7)",
+    marginBottom: 12,
+    fontFamily: "Montserrat_700Bold",
+  },
+  locationBadge: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "rgba(255, 255, 255, 0.2)",
@@ -241,35 +603,38 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     gap: 6,
   },
-  membershipText: {
+  locationText: {
     color: "#FFFFFF",
     fontSize: 12,
+    fontFamily: "Montserrat_700Bold",
+
     fontWeight: "600",
   },
   statsContainer: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "center",
     paddingHorizontal: 20,
-    marginTop: -25,
-    marginBottom: 30,
+    marginTop: -35,
+    marginBottom: 24,
+    gap: 12,
   },
   statCard: {
+    flex: 1,
+    width: 130,
     backgroundColor: "#FFFFFF",
     borderRadius: 20,
     padding: 20,
     alignItems: "center",
-    flex: 1,
-    marginHorizontal: 6,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 12,
-    elevation: 8,
+    elevation: 6,
   },
   statIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 12,
@@ -279,82 +644,107 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#1f2937",
     marginBottom: 4,
+    fontFamily: "Montserrat_700Bold",
   },
   statLabel: {
     fontSize: 12,
     color: "#6b7280",
     fontWeight: "500",
+    fontFamily: "Montserrat_700Bold",
   },
+  upgradeButton: {
+    marginTop: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    backgroundColor: "#2E8B57",
+  },
+
+  upgradeText: {
+    color: "#FFFFFF",
+    fontWeight: "600",
+    fontSize: 12,
+    fontFamily: "Montserrat_700Bold",
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  premiumText: {
+    fontSize: 12,
+    color: "#6b7280",
+    fontWeight: "500",
+    fontFamily: "Montserrat_700Bold",
+  },
+
   section: {
-    paddingHorizontal: 20,
-    marginBottom: 24,
+    paddingHorizontal: 16,
+    marginBottom: 20,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "700",
+    marginBottom: 12,
+    fontFamily: "Montserrat_700Bold",
   },
-  seeAllText: {
-    color: "#667eea",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  quickActionsGrid: {
+  menuItem: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-  },
-  actionCard: {
-    flex: 1,
-    minWidth: "47%",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 20,
     alignItems: "center",
+    padding: 14,
+    borderRadius: 14,
+    marginBottom: 8,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  actionIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  menuIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 12,
+    marginRight: 12,
   },
-  actionText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#374151",
+  menuText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "500",
+    fontFamily: "Montserrat_700Bold",
   },
   logoutButton: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 20,
+    borderRadius: 14,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  logoutGradient: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#FFFFFF",
-    marginHorizontal: 20,
-    padding: 18,
-    borderRadius: 16,
-    marginTop: 10,
-    marginBottom: 20,
-    gap: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 4,
+    padding: 16,
+    gap: 8,
   },
   logoutText: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#ef4444",
+    color: "#FFF",
+    fontFamily: "Montserrat_700Bold",
   },
   versionText: {
     textAlign: "center",
     color: "#9ca3af",
     fontSize: 12,
     marginTop: 10,
+    marginBottom: 20,
+    fontFamily: "Montserrat_700Bold",
   },
 });

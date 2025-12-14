@@ -8,7 +8,7 @@ const DEV_BASE_URL =
     : "http://10.23.71.142:4000"; // Mobile uses your PC's IP
 
 // TODO: Replace with your production URL when deployed
-const PROD_BASE_URL = "https://api.yourdomain.com";
+const PROD_BASE_URL = "https://mtaaniapp.onrender.com";
 
 // Use DEV for now, switch to PROD when deployed
 const BASE_URL = __DEV__ ? DEV_BASE_URL : PROD_BASE_URL;

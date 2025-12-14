@@ -115,6 +115,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginBottom: 20,
     fontFamily: "Montserrat_700Bold",
+    textAlign: "center",
   },
   input: {
     borderWidth: 1,
@@ -123,6 +124,7 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 12,
     fontFamily: "Montserrat_700Bold",
+    color: "#6b7280",
   },
   error: {
     color: "red",

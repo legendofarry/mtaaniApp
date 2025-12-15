@@ -352,29 +352,6 @@ export default function Profile() {
                 color={theme.colors.textDisabled}
               />
             </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.menuItem,
-                { backgroundColor: theme.colors.surface },
-              ]}
-              onPress={() => navigation.navigate("TransactionHistory")}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.menuIcon, { backgroundColor: "#10b98115" }]}>
-                <Ionicons name="receipt" size={20} color="#10b981" />
-              </View>
-              <Text
-                style={[styles.menuText, { color: theme.colors.textPrimary }]}
-              >
-                Transaction History
-              </Text>
-              <Ionicons
-                name="chevron-forward"
-                size={20}
-                color={theme.colors.textDisabled}
-              />
-            </TouchableOpacity>
           </View>
         </AnimatedCard>
 
@@ -449,7 +426,7 @@ export default function Profile() {
                 styles.menuItem,
                 { backgroundColor: theme.colors.surface },
               ]}
-              onPress={() => navigation.navigate("Help")}
+              onPress={() => navigation.navigate("HelpSupport")}
               activeOpacity={0.7}
             >
               <View style={[styles.menuIcon, { backgroundColor: "#22c55e15" }]}>

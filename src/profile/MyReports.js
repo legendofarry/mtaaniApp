@@ -5,6 +5,7 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
+  ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -17,22 +18,47 @@ const REPORTS = [
     type: "Electricity",
     period: "Monthly",
   },
-  { id: "2", name: "Water – March", type: "Water", period: "Monthly" },
-  { id: "3", name: "Token Spending", type: "Finance", period: "Quarterly" },
+  {
+    id: "2",
+    name: "Water – March",
+    type: "Water",
+    period: "Monthly",
+  },
+  {
+    id: "3",
+    name: "Token Spending",
+    type: "Finance",
+    period: "Quarterly",
+  },
 ];
 
 export default function MyReports() {
   const navigation = useNavigation();
   const user = useAuth((s) => s.user);
 
+  /* 🔒 PREMIUM GATE */
   if (user?.subscription !== "premium") {
     return (
       <View style={styles.locked}>
-        <Ionicons name="lock-closed" size={48} color="#9ca3af" />
-        <Text style={styles.lockedTitle}>Premium Only</Text>
+        <TouchableOpacity
+          style={styles.close}
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="close" size={26} />
+        </TouchableOpacity>
+
+        <Ionicons name="lock-closed" size={56} color="#9ca3af" />
+        <Text style={styles.lockedTitle}>Premium Reports</Text>
         <Text style={styles.lockedDesc}>
-          Upgrade to premium to access reports.
+          Upgrade to premium to access detailed usage, spending & insights.
         </Text>
+
+        <TouchableOpacity
+          style={styles.upgradeBtn}
+          onPress={() => navigation.navigate("Subscription")}
+        >
+          <Text style={styles.upgradeText}>Upgrade to Premium</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -41,22 +67,49 @@ export default function MyReports() {
     <View style={styles.container}>
       <Header title="My Reports" onBack={() => navigation.goBack()} />
 
-      {/* TABLE HEADER */}
-      <View style={styles.tableHeader}>
-        <Text style={[styles.col, { flex: 2 }]}>Report</Text>
-        <Text style={styles.col}>Type</Text>
-        <Text style={styles.col}>Period</Text>
+      {/* SUMMARY */}
+      <View style={styles.summaryRow}>
+        <SummaryCard label="Total Reports" value={REPORTS.length} />
+        <SummaryCard label="Latest Period" value="March" />
+        <SummaryCard label="Types" value="3" />
       </View>
 
+      {/* TABLE HEADER */}
+      <View style={styles.tableHeader}>
+        <Text style={[styles.colHeader, { flex: 2 }]}>Report</Text>
+        <Text style={styles.colHeader}>Type</Text>
+        <Text style={styles.colHeader}>Period</Text>
+      </View>
+
+      {/* TABLE */}
       <FlatList
         data={REPORTS}
         keyExtractor={(i) => i.id}
-        contentContainerStyle={{ paddingBottom: 20 }}
+        contentContainerStyle={{ paddingBottom: 24 }}
         renderItem={({ item }) => (
-          <TouchableOpacity style={styles.row}>
-            <Text style={[styles.cell, { flex: 2 }]}>{item.name}</Text>
-            <Text style={styles.cell}>{item.type}</Text>
-            <Text style={styles.cell}>{item.period}</Text>
+          <TouchableOpacity
+            style={styles.row}
+            activeOpacity={0.85}
+            onPress={() =>
+              navigation.navigate("ReportDetails", { report: item })
+            }
+          >
+            <View style={[styles.cell, { flex: 2 }]}>
+              <Text style={styles.reportName}>{item.name}</Text>
+            </View>
+
+            <Badge
+              label={item.type}
+              color={
+                item.type === "Electricity"
+                  ? "#2563eb"
+                  : item.type === "Water"
+                  ? "#0ea5e9"
+                  : "#16a34a"
+              }
+            />
+
+            <Badge label={item.period} color="#6b7280" />
           </TouchableOpacity>
         )}
       />
@@ -64,7 +117,7 @@ export default function MyReports() {
   );
 }
 
-/* ---------------- COMPONENTS ---------------- */
+/* ================= COMPONENTS ================= */
 
 const Header = ({ title, onBack }) => (
   <View style={styles.header}>
@@ -76,63 +129,153 @@ const Header = ({ title, onBack }) => (
   </View>
 );
 
-/* ---------------- STYLES ---------------- */
+const SummaryCard = ({ label, value }) => (
+  <View style={styles.summaryCard}>
+    <Text style={styles.summaryValue}>{value}</Text>
+    <Text style={styles.summaryLabel}>{label}</Text>
+  </View>
+);
+
+const Badge = ({ label, color }) => (
+  <View style={[styles.badge, { borderColor: color }]}>
+    <Text style={[styles.badgeText, { color }]}>{label}</Text>
+  </View>
+);
+
+/* ================= STYLES ================= */
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f8fafc" },
 
+  /* HEADER */
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     padding: 16,
   },
-
   headerTitle: { fontSize: 18, fontWeight: "600" },
 
+  /* SUMMARY */
+  summaryRow: {
+    flexDirection: "row",
+    gap: 12,
+    paddingHorizontal: 16,
+    marginBottom: 10,
+  },
+
+  summaryCard: {
+    flex: 1,
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 14,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+
+  summaryValue: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: "#111827",
+  },
+
+  summaryLabel: {
+    fontSize: 12,
+    color: "#6b7280",
+    marginTop: 2,
+  },
+
+  /* TABLE */
   tableHeader: {
     flexDirection: "row",
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: "#e5e7eb",
+    paddingVertical: 8,
+    marginTop: 10,
   },
 
-  col: {
+  colHeader: {
     flex: 1,
+    fontSize: 12,
     fontWeight: "600",
-    fontSize: 13,
+    color: "#6b7280",
   },
 
   row: {
     flexDirection: "row",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    alignItems: "center",
     backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderColor: "#f1f5f9",
+    marginHorizontal: 16,
+    marginTop: 10,
+    padding: 14,
+    borderRadius: 14,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
 
-  cell: {
-    flex: 1,
+  cell: { flex: 1 },
+
+  reportName: {
     fontSize: 14,
+    fontWeight: "600",
+    color: "#111827",
   },
 
+  badge: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+
+  badgeText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+
+  /* LOCKED */
   locked: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     padding: 24,
+    backgroundColor: "#f8fafc",
+  },
+
+  close: {
+    position: "absolute",
+    top: 40,
+    left: 20,
   },
 
   lockedTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: "700",
-    marginTop: 12,
+    marginTop: 14,
   },
 
   lockedDesc: {
     color: "#6b7280",
     textAlign: "center",
-    marginTop: 6,
+    marginTop: 8,
+    marginBottom: 20,
+  },
+
+  upgradeBtn: {
+    backgroundColor: "#2563eb",
+    paddingHorizontal: 26,
+    paddingVertical: 14,
+    borderRadius: 14,
+  },
+
+  upgradeText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 15,
   },
 });

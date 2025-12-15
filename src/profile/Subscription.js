@@ -46,7 +46,7 @@ export default function Subscription() {
   }, []);
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView style={styles.container}>
       <Header title="Subscription" onBack={() => navigation.goBack()} />
 
       <Animated.View style={{ opacity: fade }}>
@@ -83,7 +83,7 @@ export default function Subscription() {
 
         {/* CTA */}
         {!isPremium && (
-          <Animated.View style={{ transform: [{ scale: pulse }] }}>
+          <Animated.View>
             <TouchableOpacity
               style={[
                 styles.upgradeBtn,
@@ -188,9 +188,10 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 18, fontWeight: "600" },
 
   cardsRow: {
-    flexDirection: "row",
-    justifyContent: "space-around",
+    flexDirection: "column",
     marginBottom: 6,
+    alignItems: "center",
+    gap: 10,
   },
 
   card: {

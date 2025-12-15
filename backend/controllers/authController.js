@@ -9,7 +9,6 @@ const transporter = require("../config/mailer");
 const logger = require("../config/logger");
 const { OAuth2Client } = require("google-auth-library");
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-const fetch = require("node-fetch");
 
 const SALT_ROUNDS = parseInt(process.env.BCRYPT_SALT_ROUNDS || "10");
 

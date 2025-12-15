@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 12,
     fontFamily: "Montserrat_700Bold",
-    color: "#6b7280",
+    color: "#6b728086",
   },
   error: {
     color: "red",

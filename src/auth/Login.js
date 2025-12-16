@@ -62,6 +62,7 @@ export default function Login({ navigation }) {
       // 🔥 THIS TRIGGERS ROUTES RE-RENDER
       await login({
         token: data.accessToken,
+        user: data.user || null,
       });
     } catch (err) {
       console.log("Login error:", err);

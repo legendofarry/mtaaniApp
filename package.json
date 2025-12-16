@@ -30,6 +30,7 @@
     "expo-splash-screen": "~31.0.12",
     "expo-status-bar": "~3.0.9",
     "expo-web-browser": "~15.0.10",
+    "firebase": "^12.7.0",
     "kenya-locations": "^0.2.0",
     "lottie-ios": "^4.5.1",
     "lottie-react": "^2.4.1",

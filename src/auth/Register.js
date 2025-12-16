@@ -18,6 +18,13 @@ import { Button } from "../common/Button";
 import { Ionicons } from "@expo/vector-icons";
 import { API_URL, headers } from "../services/api";
 import LottieWrapper from "../components/LottieWrapper";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+  signInWithPopup,
+  GoogleAuthProvider,
+  FacebookAuthProvider,
+} from "firebase/auth";
+import { auth } from "../config/firebase";
 
 const SCREEN_HEIGHT = Dimensions.get("window").height;
 
@@ -51,6 +58,7 @@ export default function Register({ navigation }) {
     return true;
   };
 
+  // ==================== MANUAL REGISTRATION ====================
   const handleRegister = async () => {
     if (!validateInputs()) return;
 
@@ -63,38 +71,27 @@ export default function Register({ navigation }) {
         email: email.trim().toLowerCase(),
         password,
         location: {
-          area: "pending", // Will be updated during onboarding
+          area: "pending",
         },
       };
 
       const url = `${API_URL}/auth/register`;
-      console.log("📤 Registering to:", url);
-      console.log("📦 Payload:", payload);
-
       const res = await fetch(url, {
         method: "POST",
         headers: headers(),
         body: JSON.stringify(payload),
       });
 
-      console.log("📊 Response status:", res.status);
-
       const data = await res.json();
-      console.log("📥 Response:", data);
 
       if (res.ok && data.success) {
-        // Show dev OTP in dev mode
-        if (__DEV__ && data.otp) {
-          Alert.alert("Dev OTP", `Your OTP is: ${data.otp}`);
-        }
-
-        // Navigate to OTP screen
-        navigation.navigate("OTP", {
+        // Navigate to Verification screen (not OTP)
+        navigation.navigate("Verification", {
           email: email.trim().toLowerCase(),
           userId: data.userId,
+          fullName: name.trim(),
         });
       } else {
-        // Handle known errors
         if (res.status === 409) {
           setError("This email is already registered. Please sign in.");
         } else {
@@ -102,8 +99,110 @@ export default function Register({ navigation }) {
         }
       }
     } catch (err) {
-      console.error("❌ Register error:", err);
+      console.error("Register error:", err);
       setError("Network error. Check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ==================== GOOGLE SIGN-IN ====================
+  const handleGoogleSignIn = async () => {
+    if (Platform.OS !== "web") {
+      Alert.alert(
+        "Not supported",
+        "Google sign-in is currently available on web only. Please use email registration."
+      );
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      const res = await fetch(`${API_URL}/auth/sync-firebase-user`, {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({
+          firebaseUid: user.uid,
+          email: user.email,
+          fullName: user.displayName || "User",
+          signupMethod: "google",
+          photoURL: user.photoURL,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || "Google sign-in failed");
+      }
+
+      await AsyncStorage.setItem("token", data.accessToken);
+      await AsyncStorage.setItem("user", JSON.stringify(data.user));
+
+      navigation.replace("Onboarding", {
+        userId: data.userId,
+        token: data.accessToken,
+      });
+    } catch (err) {
+      console.error("Google sign-in error:", err);
+      setError("Google sign-in failed. Please use email registration.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ==================== FACEBOOK SIGN-IN ====================
+  const handleFacebookSignIn = async () => {
+    if (Platform.OS !== "web") {
+      Alert.alert(
+        "Not supported",
+        "Facebook sign-in is currently available on web only. Please use email registration."
+      );
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const provider = new FacebookAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      const res = await fetch(`${API_URL}/auth/sync-firebase-user`, {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({
+          firebaseUid: user.uid,
+          email: user.email,
+          fullName: user.displayName || "User",
+          signupMethod: "facebook",
+          photoURL: user.photoURL,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || "Facebook sign-in failed");
+      }
+
+      await AsyncStorage.setItem("token", data.accessToken);
+      await AsyncStorage.setItem("user", JSON.stringify(data.user));
+
+      navigation.replace("Onboarding", {
+        userId: data.userId,
+        token: data.accessToken,
+      });
+    } catch (err) {
+      console.error("Facebook sign-in error:", err);
+      setError("Facebook sign-in failed. Please use email registration.");
     } finally {
       setLoading(false);
     }
@@ -118,7 +217,6 @@ export default function Register({ navigation }) {
         style={{ flex: 1 }}
       >
         <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-          {/* FORM PANEL */}
           <View
             style={[
               styles.panel,
@@ -137,6 +235,41 @@ export default function Register({ navigation }) {
             >
               Join the community services network
             </Text>
+
+            {/* SOCIAL SIGN-IN BUTTONS */}
+            <View style={styles.socialContainer}>
+              <TouchableOpacity
+                style={[styles.socialButton, { backgroundColor: "#DB4437" }]}
+                onPress={handleGoogleSignIn}
+                disabled={loading}
+              >
+                <Ionicons name="logo-google" size={20} color="#fff" />
+                <Text style={styles.socialButtonText}>Google</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.socialButton, { backgroundColor: "#1877F2" }]}
+                onPress={handleFacebookSignIn}
+                disabled={loading}
+              >
+                <Ionicons name="logo-facebook" size={20} color="#fff" />
+                <Text style={styles.socialButtonText}>Facebook</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* DIVIDER */}
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text
+                style={[
+                  styles.dividerText,
+                  { color: theme.colors.textSecondary },
+                ]}
+              >
+                or continue with email
+              </Text>
+              <View style={styles.dividerLine} />
+            </View>
 
             {/* Full Name */}
             <View style={styles.inputRow}>
@@ -242,7 +375,7 @@ export default function Register({ navigation }) {
             </View>
           </View>
 
-          {/* 🎨 LOTTIE SECTION */}
+          {/* LOTTIE SECTION */}
           <View style={styles.lottieContainer}>
             <LottieWrapper
               source="https://lottie.host/5e8f68e7-5367-4bca-b0ce-3fd50a9a7838/wDZfM0DQY8.lottie"
@@ -274,6 +407,47 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     marginBottom: 18,
+  },
+
+  // SOCIAL BUTTONS
+  socialContainer: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 20,
+  },
+
+  socialButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    borderRadius: 12,
+    gap: 8,
+  },
+
+  socialButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+
+  // DIVIDER
+  divider: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "#E6E6E6",
+  },
+
+  dividerText: {
+    marginHorizontal: 12,
+    fontSize: 12,
   },
 
   inputRow: {

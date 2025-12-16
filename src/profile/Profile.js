@@ -221,7 +221,7 @@ export default function Profile() {
               {!isPremium && (
                 <TouchableOpacity
                   style={styles.upgradeButton}
-                  onPress={() => {}}
+                  onPress={() => navigation.navigate("Subscription")}
                   activeOpacity={0.8}
                 >
                   <View style={{ flexDirection: "row", alignItems: "center" }}>

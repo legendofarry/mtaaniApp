@@ -1,363 +1,547 @@
 // backend/controllers/authController.js
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 const jwtLib = require("../utils/jwt");
 const User = require("../models/User");
-const Otp = require("../models/Otp");
-const generateOTP = require("../utils/generateOTP");
-const saveOtp = require("../utils/saveOtp");
-const transporter = require("../config/mailer");
+const MagicToken = require("../models/MagicToken");
 const logger = require("../config/logger");
-const { OAuth2Client } = require("google-auth-library");
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-const fetch = require("node-fetch");
+const { Resend } = require("resend");
 
-const SALT_ROUNDS = parseInt(process.env.BCRYPT_SALT_ROUNDS || "10");
+// -------------------- EMAIL (RESEND) --------------------
+let resend = null;
+
+if (process.env.RESEND_API_KEY) {
+  resend = new Resend(process.env.RESEND_API_KEY);
+  logger.info("📧 Resend email service initialized");
+} else {
+  logger.warn("⚠️ RESEND_API_KEY missing. Emails disabled (dev-safe).");
+}
 
 function devIsEnabled() {
   return process.env.NODE_ENV !== "production";
 }
 
+/* ================= REGISTER ================= */
 exports.register = async (req, res) => {
   try {
-    const { fullName, email, password, phone, location, signupMethod } =
-      req.body;
+    const { fullName, email, password } = req.body;
 
-    if (!email || !fullName || !location || !location.area) {
+    if (!fullName || !email || !password) {
       return res.status(400).json({
         success: false,
-        message: "Missing required fields: fullName, email, location.area",
+        message: "All fields are required",
       });
     }
 
-    // normalize email
-    const emailNormalized = String(email).toLowerCase();
+    const emailNormalized = email.toLowerCase();
 
-    const existing = await User.findOne({ email: emailNormalized });
-    if (existing)
-      return res
-        .status(409)
-        .json({ success: false, message: "Email already exists" });
+    const existingUser = await User.findOne({ email: emailNormalized });
+    if (existingUser) {
+      return res.status(409).json({
+        success: false,
+        message: "Email already registered",
+      });
+    }
 
-    const passwordHash = password
-      ? await bcrypt.hash(password, SALT_ROUNDS)
-      : undefined;
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-    const user = new User({
+    const user = await User.create({
       fullName,
       email: emailNormalized,
-      phone,
-      passwordHash,
-      signupMethod: signupMethod || "email",
-      location: {
-        area: location.area,
-        estate: location.estate || undefined,
-        apartmentName: location.apartmentName || undefined,
-        plotNumber: location.plotNumber || undefined,
-        block: location.block || undefined,
-        floor: location.floor || undefined,
-        houseNumber: location.houseNumber || undefined,
-        landmark: location.landmark || undefined,
-        gps: location.gps || undefined,
-        structureNumber: location.structureNumber || undefined,
-      },
+      password: hashedPassword,
+      signupMethod: "email",
       verified: false,
+      onboardingCompleted: false,
     });
 
-    // Save user first
-    await user.save();
-    logger.info(`User created: ${user._id}`);
+    const token = jwtLib.sign({ id: user._id });
 
-    // Generate OTP
-    let otpCode = null;
-    try {
-      otpCode = generateOTP(6);
-      await saveOtp(emailNormalized, otpCode, "verify", 10 * 60);
-      logger.info(`OTP generated for ${emailNormalized}: ${otpCode}`);
-
-      // Send email (skip in dev mode if you want)
-      if (!devIsEnabled()) {
-        const mail = {
-          from: process.env.EMAIL_FROM,
-          to: emailNormalized,
-          subject: "Your MtaaniFlow verification code",
-          html: `<p>Your verification code is <strong>${otpCode}</strong></p>`,
-        };
-        await transporter.sendMail(mail);
-        logger.info(`OTP email sent to ${emailNormalized}`);
-      }
-    } catch (otpErr) {
-      logger.error("OTP creation/send failed:", otpErr.message || otpErr);
-      // Continue - user is created, they can request OTP again
-    }
-
-    // Build response
-    const response = {
+    return res.status(201).json({
       success: true,
-      message: devIsEnabled()
-        ? "Account created (dev mode). Check console for OTP"
-        : "Account created. Check your email for verification code.",
-      userId: user._id,
-    };
+      accessToken: token,
+      userId: user._id.toString(),
+      user: {
+        id: user._id.toString(),
+        email: user.email,
+        fullName: user.fullName,
+        verified: user.verified,
+        onboardingCompleted: user.onboardingCompleted,
+      },
+    });
+  } catch (err) {
+    logger.error("Register error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Registration failed",
+    });
+  }
+};
 
-    // Return OTP in dev mode
-    if (devIsEnabled() && otpCode) {
-      response.otp = otpCode;
+// ==================== LOGIN ====================
+exports.login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and password required",
+      });
     }
 
-    return res.status(201).json(response);
+    const emailNormalized = email.toLowerCase();
+    const user = await User.findOne({ email: emailNormalized });
+
+    if (!user || !user.password) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password",
+      });
+    }
+
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password",
+      });
+    }
+
+    const token = jwtLib.sign({ id: user._id });
+
+    return res.json({
+      success: true,
+      accessToken: token,
+      userId: user._id.toString(),
+      user: {
+        id: user._id.toString(),
+        email: user.email,
+        fullName: user.fullName,
+        verified: user.verified,
+        onboardingCompleted: user.onboardingCompleted || false,
+      },
+    });
   } catch (err) {
-    logger.error("Register error:", err.message || err);
-    return res
-      .status(500)
-      .json({ success: false, message: "Server error during registration" });
+    logger.error("Login error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Login failed",
+    });
   }
 };
 
-exports.requestOtp = async (req, res) => {
-  const { email, purpose = "verify" } = req.body;
-  if (!email)
-    return res.status(400).json({ success: false, message: "Email required" });
-
-  const emailNormalized = String(email).toLowerCase();
-
-  const user = await User.findOne({ email: emailNormalized });
-  if (!user)
-    return res.status(404).json({ success: false, message: "User not found" });
-
-  const otp = generateOTP(6);
+// ==================== FORGOT PASSWORD ====================
+exports.forgotPassword = async (req, res) => {
   try {
-    await saveOtp(emailNormalized, otp, purpose, 10 * 60);
-  } catch (err) {
-    logger.warn("Failed to save OTP:", err.message || err);
-  }
+    const { email } = req.body;
+    if (!email) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Email required" });
+    }
 
-  const mail = {
-    from: process.env.EMAIL_FROM,
-    to: emailNormalized,
-    subject: "Your MtaaniFlow verification code",
-    html: `<p>Your verification code is <strong>${otp}</strong></p>`,
-  };
+    const emailNormalized = email.toLowerCase();
+    const user = await User.findOne({ email: emailNormalized });
 
-  try {
-    if (!devIsEnabled()) await transporter.sendMail(mail);
-    const response = { success: true, message: "OTP created" };
-    if (devIsEnabled()) response.otp = otp;
-    return res.json(response);
+    if (!user) {
+      return res.json({
+        success: true,
+        message: "If the email exists, a reset link was sent",
+      });
+    }
+
+    const token = crypto.randomBytes(32).toString("hex");
+
+    await MagicToken.create({
+      email: emailNormalized,
+      token,
+      userId: user._id,
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+    });
+
+    const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+
+    if (resend) {
+      await resend.emails.send({
+        from: process.env.EMAIL_FROM || "MtaaniFlow <onboarding@resend.dev>",
+        to: emailNormalized,
+        subject: "Reset your password",
+        html: `<p>Click to reset password:</p><a href="${resetLink}">${resetLink}</a>`,
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: "If the email exists, a reset link was sent",
+      ...(devIsEnabled() && { resetLink, token }),
+    });
   } catch (err) {
-    logger.warn("Failed to send OTP:", err.message || err);
-    if (devIsEnabled())
-      return res.json({ success: true, message: "OTP created (dev)", otp });
-    return res
-      .status(500)
-      .json({ success: false, message: "Failed to send OTP" });
+    logger.error("Forgot password error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to process request",
+    });
   }
 };
 
-exports.verifyOtp = async (req, res) => {
-  const { email, otp, purpose = "verify" } = req.body;
-  if (!email || !otp)
-    return res.status(400).json({ success: false, message: "Missing fields" });
+// ==================== RESET PASSWORD ====================
+exports.resetPassword = async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
 
-  const emailNormalized = String(email).toLowerCase();
+    if (!token || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Token and new password required",
+      });
+    }
 
-  const otpDoc = await Otp.findOne({
-    email: emailNormalized,
-    code: otp,
-    purpose,
-    used: false,
-  }).sort({ createdAt: -1 });
-  if (!otpDoc)
-    return res
-      .status(400)
-      .json({ success: false, message: "Invalid or expired OTP" });
-  if (otpDoc.expiresAt && otpDoc.expiresAt < new Date())
-    return res.status(400).json({ success: false, message: "OTP expired" });
+    const magicToken = await MagicToken.findOne({
+      token,
+      used: false,
+      expiresAt: { $gt: new Date() },
+    });
 
-  otpDoc.used = true;
-  await otpDoc.save();
+    if (!magicToken) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired token",
+      });
+    }
 
-  // mark user verified if purpose is verify
-  const user = await User.findOne({ email: emailNormalized });
-  if (!user)
-    return res.status(404).json({ success: false, message: "User not found" });
+    const user = await User.findById(magicToken.userId);
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    }
 
-  if (purpose === "verify") {
+    const hashed = await bcrypt.hash(newPassword, 10);
+    user.password = hashed;
     user.verified = true;
     await user.save();
-  }
 
-  const token = jwtLib.sign({ id: user._id });
-  return res.json({
-    success: true,
-    message: "OTP verified",
-    accessToken: token,
-    userId: user._id.toString(), // ⭐ Add userId at root level
-    user: {
-      id: user._id.toString(),
-      email: user.email,
-      onboardingCompleted: user.onboardingCompleted || false,
-    },
-  });
-};
+    magicToken.used = true;
+    await magicToken.save();
 
-exports.login = async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password)
-    return res.status(400).json({ success: false, message: "Missing fields" });
-
-  const emailNormalized = String(email).toLowerCase();
-
-  const user = await User.findOne({ email: emailNormalized });
-  if (!user)
-    return res.status(404).json({ success: false, message: "User not found" });
-  if (!user.passwordHash)
-    return res
-      .status(400)
-      .json({ success: false, message: "Account uses social login" });
-
-  const ok = await bcrypt.compare(password, user.passwordHash);
-  if (!ok)
-    return res
-      .status(401)
-      .json({ success: false, message: "Invalid credentials" });
-
-  const token = jwtLib.sign({ id: user._id });
-  return res.json({
-    success: true,
-    accessToken: token,
-    user: { id: user._id, email: user.email, fullName: user.fullName },
-  });
-};
-
-exports.forgotPassword = async (req, res) => {
-  const { email } = req.body;
-  if (!email)
-    return res.status(400).json({ success: false, message: "Email required" });
-
-  const emailNormalized = String(email).toLowerCase();
-
-  const user = await User.findOne({ email: emailNormalized });
-  if (!user)
-    return res.status(404).json({ success: false, message: "User not found" });
-
-  const otp = generateOTP(6);
-  try {
-    await saveOtp(emailNormalized, otp, "reset", 15 * 60);
-  } catch (err) {
-    logger.warn("Failed to save reset OTP:", err.message || err);
-  }
-
-  const mail = {
-    from: process.env.EMAIL_FROM,
-    to: emailNormalized,
-    subject: "Password reset code",
-    html: `<p>Your password reset code is <strong>${otp}</strong></p>`,
-  };
-
-  try {
-    if (!devIsEnabled()) await transporter.sendMail(mail);
-    const response = { success: true, message: "Reset OTP sent" };
-    if (devIsEnabled()) response.otp = otp;
-    return res.json(response);
-  } catch (err) {
-    logger.warn("Failed to send reset email:", err.message);
-    if (devIsEnabled())
-      return res.json({ success: true, message: "Reset OTP (dev)", otp });
-    return res
-      .status(500)
-      .json({ success: false, message: "Failed to send reset email" });
-  }
-};
-
-exports.resetPassword = async (req, res) => {
-  const { email, otp, newPassword } = req.body;
-  if (!email || !otp || !newPassword)
-    return res.status(400).json({ success: false, message: "Missing fields" });
-
-  const emailNormalized = String(email).toLowerCase();
-
-  const otpDoc = await Otp.findOne({
-    email: emailNormalized,
-    code: otp,
-    purpose: "reset",
-    used: false,
-  }).sort({ createdAt: -1 });
-  if (!otpDoc)
-    return res
-      .status(400)
-      .json({ success: false, message: "Invalid or expired OTP" });
-
-  otpDoc.used = true;
-  await otpDoc.save();
-
-  const hash = await bcrypt.hash(newPassword, SALT_ROUNDS);
-  const user = await User.findOneAndUpdate(
-    { email: emailNormalized },
-    { passwordHash: hash },
-    { new: true }
-  );
-  return res.json({ success: true, message: "Password reset successful" });
-};
-
-exports.google = async (req, res) => {
-  const { idToken } = req.body;
-  if (!idToken)
-    return res.status(400).json({ success: false, message: "Missing idToken" });
-
-  const ticket = await client.verifyIdToken({
-    idToken,
-    audience: process.env.GOOGLE_CLIENT_ID,
-  });
-  const payload = ticket.getPayload();
-  const email = payload.email;
-  let user = await User.findOne({ email });
-  if (!user) {
-    user = new User({
-      fullName: payload.name || "",
-      email,
-      signupMethod: "google",
-      verified: true,
+    return res.json({
+      success: true,
+      message: "Password reset successful",
     });
-    await user.save();
+  } catch (err) {
+    logger.error("Reset password error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Password reset failed",
+    });
   }
-  const token = jwtLib.sign({ id: user._id });
-  res.json({
-    success: true,
-    accessToken: token,
-    user: { id: user._id, email },
-  });
 };
 
-exports.facebook = async (req, res) => {
-  const { accessToken } = req.body;
-  if (!accessToken)
-    return res
-      .status(400)
-      .json({ success: false, message: "Missing accessToken" });
-  // call FB debug / me endpoint
-  const resp = await fetch(
-    `https://graph.facebook.com/me?fields=id,name,email&access_token=${accessToken}`
-  );
-  const json = await resp.json();
-  if (json.error)
-    return res
-      .status(400)
-      .json({ success: false, message: "Invalid FB token" });
-  const email = json.email;
-  let user = await User.findOne({ email });
-  if (!user) {
-    user = new User({
-      fullName: json.name || "",
-      email,
-      signupMethod: "facebook",
-      verified: true,
+// ==================== FIREBASE USER SYNC ====================
+exports.syncFirebaseUser = async (req, res) => {
+  try {
+    const { firebaseUid, email, fullName, signupMethod, photoURL } = req.body;
+
+    if (!firebaseUid || !email) {
+      return res.status(400).json({
+        success: false,
+        message: "firebaseUid and email required",
+      });
+    }
+
+    const emailNormalized = email.toLowerCase();
+    let user = await User.findOne({ email: emailNormalized });
+
+    if (!user) {
+      user = new User({
+        fullName: fullName || "User",
+        email: emailNormalized,
+        signupMethod: signupMethod || "firebase",
+        firebaseUid,
+        verified: true,
+        onboardingCompleted: false,
+        profileImageUrl: photoURL,
+      });
+      await user.save();
+    }
+
+    const token = jwtLib.sign({ id: user._id });
+
+    return res.json({
+      success: true,
+      accessToken: token,
+      userId: user._id.toString(),
+      user: {
+        id: user._id.toString(),
+        email: user.email,
+        fullName: user.fullName,
+        verified: true,
+        onboardingCompleted: user.onboardingCompleted || false,
+      },
     });
-    await user.save();
+  } catch (err) {
+    logger.error("Firebase sync error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Firebase sync failed",
+    });
   }
-  const token = jwtLib.sign({ id: user._id });
-  res.json({
-    success: true,
-    accessToken: token,
-    user: { id: user._id, email },
-  });
+};
+
+// ==================== MAGIC LINK ====================
+exports.sendMagicLink = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Email required" });
+    }
+
+    const emailNormalized = email.toLowerCase();
+    const user = await User.findOne({ email: emailNormalized });
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    }
+
+    const token = crypto.randomBytes(32).toString("hex");
+
+    await MagicToken.create({
+      email: emailNormalized,
+      token,
+      userId: user._id,
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+    });
+
+    const magicLink = `${process.env.API_URL}/api/auth/verify-email?token=${token}`;
+
+    if (resend) {
+      await resend.emails.send({
+        from: process.env.EMAIL_FROM || "MtaaniFlow <onboarding@resend.dev>",
+        to: emailNormalized,
+        subject: "🔐 Let's get you verified, chief!",
+        html: `
+      <body>
+        <div class="container">
+          <div class="header">
+            <div class="logo">MtaaniFlow</div>
+            <div class="tagline">Where community magic happens ✨</div>
+          </div>
+          
+          <div class="card">
+            <div class="emoji">🎉</div>
+            
+            <h1 class="greeting">Hey there, future community superstar! 👋</h1>
+            
+            <div class="message">
+              <p>Someone (hopefully you!) is trying to join MtaaniFlow. To make sure it's really you and not an over-enthusiastic robot 🤖, we need you to click that glorious button below.</p>
+              
+              <p>This magic link will expire faster than a free pizza at a developer meetup, so don't wait too long!</p>
+            </div>
+            
+            <a href="${magicLink}" class="button">
+              <span class="button-text">✨ Click Me! I'm Magical! ✨</span>
+              <span class="arrow">→</span>
+            </a>
+            
+            <div class="tip">
+              <strong>💡 Pro Tip:</strong> If the button above is feeling shy, you can copy and paste this link into your browser:
+              <div class="magic-text">${magicLink}</div>
+            </div>
+            
+            <div class="fun-fact">
+              "Did you know? The first 'verify your email' link was sent in 1971. We've come a long way from green screens!"
+            </div>
+            
+            <div class="message">
+              <p>If you didn't request this, no worries! Just ignore this email and carry on with your day. Your coffee ☕ is getting cold anyway.</p>
+            </div>
+          </div>
+          
+          <div class="footer">
+            <p>Sent with 💖 by the team at MtaaniFlow</p>
+            <p>Need help? <a href="mailto:support@mtaaniflow.com">Reply to this email</a> • We're here for you!</p>
+            <p style="font-size: 12px; margin-top: 10px;">
+              This link expires in 24 hours. Because magic has an expiration date too! ⏰
+            </p>
+          </div>
+        </div>
+      </body>
+    `,
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: "Verification sent",
+      ...(devIsEnabled() && { token, magicLink }),
+    });
+  } catch (err) {
+    logger.error("Magic link error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to send magic link",
+    });
+  }
+};
+
+// ==================== VERIFY MAGIC LINK ====================
+exports.verifyMagicLink = async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    const magicToken = await MagicToken.findOne({
+      token,
+      used: false,
+      expiresAt: { $gt: new Date() },
+    });
+
+    if (!magicToken) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired token",
+      });
+    }
+
+    const user = await User.findById(magicToken.userId);
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    }
+
+    magicToken.used = true;
+    await magicToken.save();
+
+    user.verified = true;
+    await user.save();
+
+    const jwtToken = jwtLib.sign({ id: user._id });
+
+    return res.json({
+      success: true,
+      accessToken: jwtToken,
+      userId: user._id.toString(),
+      user: {
+        id: user._id.toString(),
+        email: user.email,
+        fullName: user.fullName,
+        verified: true,
+        onboardingCompleted: user.onboardingCompleted || false,
+      },
+    });
+  } catch (err) {
+    logger.error("Verify magic link error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Verification failed",
+    });
+  }
+};
+
+// ==================== PASSKEY ====================
+exports.savePasskey = async (req, res) => {
+  try {
+    const { userId, passkeyEnabled } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    }
+
+    user.biometrics = {
+      enabled: passkeyEnabled === true,
+      createdAt: new Date(),
+      lastUsed: new Date(),
+    };
+
+    await user.save();
+
+    return res.json({
+      success: true,
+      message: "Passkey saved",
+    });
+  } catch (err) {
+    logger.error("Save passkey error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to save passkey",
+    });
+  }
+};
+
+/* ================= VERIFY EMAIL (CLICK LINK) ================= */
+exports.verifyEmailFromLink = async (req, res) => {
+  try {
+    const { token } = req.query;
+
+    if (!token) {
+      return res.status(400).send("Invalid verification link");
+    }
+
+    const record = await MagicToken.findOne({
+      token,
+      used: false,
+      expiresAt: { $gt: new Date() },
+    });
+
+    if (!record) {
+      return res.status(400).send("Verification link expired or invalid");
+    }
+
+    const user = await User.findById(record.userId);
+    if (!user) {
+      return res.status(404).send("User not found");
+    }
+
+    user.verified = true;
+    await user.save();
+
+    record.used = true;
+    await record.save();
+
+    // ✅ NO WHITE SCREEN
+    return res.redirect(`${process.env.FRONTEND_URL}/verified-success`);
+  } catch (err) {
+    logger.error("Email verification error:", err);
+    return res.status(500).send("Verification failed");
+  }
+};
+
+exports.checkVerificationStatus = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    return res.json({
+      success: true,
+      verified: user.verified,
+      user,
+    });
+  } catch (error) {
+    console.error("Check verification error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
 };

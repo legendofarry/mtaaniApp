@@ -1,4 +1,4 @@
-// backend\models\User.js
+// backend/models/User.js
 const mongoose = require("mongoose");
 
 const locationSchema = new mongoose.Schema({
@@ -39,8 +39,11 @@ const userSchema = new mongoose.Schema(
   {
     fullName: { type: String, required: true },
     email: { type: String, required: true, unique: true },
-    phone: { type: String, unique: true },
+    phone: { type: String, unique: true, sparse: true },
     passwordHash: { type: String },
+
+    // ⭐ NEW: Firebase UID for social auth
+    firebaseUid: { type: String, unique: true, sparse: true },
 
     signupMethod: {
       type: String,
@@ -49,11 +52,8 @@ const userSchema = new mongoose.Schema(
     },
 
     verified: { type: Boolean, default: false },
-
-    // ⭐ NEW: Track onboarding completion
     onboardingCompleted: { type: Boolean, default: false },
 
-    // ⭐ NEW: Track profile completion fields
     gender: { type: String, enum: ["male", "female", "other"] },
     age: { type: Number },
 
@@ -65,13 +65,10 @@ const userSchema = new mongoose.Schema(
     },
 
     biometrics: biometricsSchema,
-
     premium: premiumSchema,
-
     reputation: reputationSchema,
 
     profileImageUrl: { type: String },
-
     deviceTokens: [{ type: String }],
   },
   { timestamps: true }

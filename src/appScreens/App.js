@@ -1,3 +1,4 @@
+// src\appScreens\App.js
 import "react-native-gesture-handler";
 import React, { useEffect, useState, useCallback } from "react";
 import { NavigationContainer } from "@react-navigation/native";

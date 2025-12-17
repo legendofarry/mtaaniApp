@@ -1,12 +1,19 @@
+// backend/routes/userRoutes.js
+
 const express = require("express");
 const router = express.Router();
+
 const authMiddleware = require("../middleware/authMiddleware");
 const userController = require("../controllers/userController");
 
+/**
+ * Get current authenticated user
+ */
 router.get("/me", authMiddleware, userController.getMe);
-router.put("/me", authMiddleware, userController.updateProfile);
 
-// ⭐ NEW: Update user by ID (for onboarding - can add authMiddleware if needed)
-router.put("/:userId", userController.updateUserById);
+/**
+ * Update own profile (non-onboarding)
+ */
+router.put("/me", authMiddleware, userController.updateProfile);
 
 module.exports = router;

@@ -1,25 +1,56 @@
+// backend/middleware/authMiddleware.js
+
 const jwt = require("jsonwebtoken");
-const User = require("../models/User");
 
-module.exports = async (req, res, next) => {
-  const auth = req.headers.authorization;
-  if (!auth)
-    return res
-      .status(401)
-      .json({ success: false, message: "Missing auth header" });
+/**
+ * ======================================================
+ * AUTH MIDDLEWARE
+ * ------------------------------------------------------
+ * - Validates JWT
+ * - Extracts user ID
+ * - Attaches req.user.id
+ * - Does NOT load full user
+ * ======================================================
+ */
+module.exports = (req, res, next) => {
+  const authHeader = req.headers.authorization;
 
-  const token = auth.split(" ")[1];
+  if (!authHeader) {
+    return res.status(401).json({
+      success: false,
+      message: "Authorization header missing",
+    });
+  }
+
+  // Expected format: Bearer <token>
+  const parts = authHeader.split(" ");
+  if (parts.length !== 2 || parts[0] !== "Bearer") {
+    return res.status(401).json({
+      success: false,
+      message: "Invalid authorization format",
+    });
+  }
+
+  const token = parts[1];
+
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = await User.findById(payload.id).select("-passwordHash");
-    if (!req.user)
-      return res
-        .status(401)
-        .json({ success: false, message: "User not found" });
+
+    if (!payload?.id) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid token payload",
+      });
+    }
+
+    // 🔑 Attach ONLY the identity
+    req.user = { id: payload.id };
+
     next();
   } catch (err) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Invalid or expired token" });
+    return res.status(401).json({
+      success: false,
+      message: "Invalid or expired token",
+    });
   }
 };

@@ -10,54 +10,102 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
-import * as LocalAuthentication from "expo-local-authentication";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 
-import { API_URL, headers } from "../services/api";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as LocalAuthentication from "expo-local-authentication";
+import * as WebBrowser from "expo-web-browser";
+import * as Google from "expo-auth-session/providers/google";
+
 import { auth } from "../config/firebase";
 import {
   signInWithEmailAndPassword,
   GoogleAuthProvider,
-  signInWithPopup,
   signInWithCredential,
 } from "firebase/auth";
 
+import { API_URL, headers } from "../services/api";
 import {
   getBiometricCredentials,
   clearBiometricCredentials,
 } from "../utils/biometricStorage";
-
-import * as WebBrowser from "expo-web-browser";
-import * as Google from "expo-auth-session/providers/google";
 
 WebBrowser.maybeCompleteAuthSession();
 
 const Login = ({ navigation }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-
   const [loading, setLoading] = useState(false);
+
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [savedBiometricEmail, setSavedBiometricEmail] = useState(null);
 
   /* ======================================================
-     GOOGLE AUTH REQUEST
+     GOOGLE AUTH (WEB ONLY)
   ====================================================== */
   const [request, response, promptAsync] = Google.useAuthRequest({
-    androidClientId:
-      "437462714105-xxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com",
     webClientId:
-      "437462714105-yyyyyyyyyyyyyyyyyyyyyyyy.apps.googleusercontent.com",
+      "70284803846-9kiqh3g4s2h2qcmpbvs3nhqb9g7mvm30.apps.googleusercontent.com",
     scopes: ["profile", "email"],
+    useProxy: true,
   });
 
   /* ======================================================
-     HANDLE GOOGLE RESPONSE
+     ROUTE AFTER LOGIN (BACKEND IS SOURCE OF TRUTH)
+  ====================================================== */
+  const routeAfterLogin = (user) => {
+    if (!user) return;
+
+    // 1️⃣ Onboarding is mandatory
+    if (!user.onboardingCompleted) {
+      navigation.reset({
+        index: 0,
+        routes: [{ name: "Onboarding" }],
+      });
+      return;
+    }
+
+    // 2️⃣ Passkey already enabled → Home
+    if (user.biometrics?.enabled) {
+      navigation.reset({
+        index: 0,
+        routes: [{ name: "Home" }],
+      });
+      return;
+    }
+
+    // 3️⃣ Optional passkey prompt
+    Alert.alert(
+      "Secure your account",
+      "Would you like to enable passkey (biometrics) for faster and safer login?",
+      [
+        {
+          text: "Not now",
+          style: "cancel",
+          onPress: () =>
+            navigation.reset({
+              index: 0,
+              routes: [{ name: "Home" }],
+            }),
+        },
+        {
+          text: "Enable",
+          onPress: () =>
+            navigation.reset({
+              index: 0,
+              routes: [{ name: "EnablePasskey" }],
+            }),
+        },
+      ]
+    );
+  };
+
+  /* ======================================================
+     HANDLE GOOGLE LOGIN RESPONSE
   ====================================================== */
   useEffect(() => {
-    const handleGoogleLogin = async () => {
-      if (response?.type !== "success") return;
+    if (response?.type !== "success") return;
 
+    const handleGoogleLogin = async () => {
       try {
         setLoading(true);
 
@@ -65,34 +113,27 @@ const Login = ({ navigation }) => {
         const credential = GoogleAuthProvider.credential(id_token);
 
         const result = await signInWithCredential(auth, credential);
-        const user = result.user;
+        const firebaseUser = result.user;
 
-        // Sync with backend
         const res = await fetch(`${API_URL}/auth/sync-firebase-user`, {
           method: "POST",
           headers: headers(),
           body: JSON.stringify({
-            firebaseUid: user.uid,
-            email: user.email,
-            fullName: user.displayName,
+            firebaseUid: firebaseUser.uid,
+            email: firebaseUser.email,
+            fullName: firebaseUser.displayName,
             provider: "google",
+            photoURL: firebaseUser.photoURL,
           }),
         });
 
         const data = await res.json();
-        if (!res.ok) {
-          throw new Error(data.message || "Failed to sync user");
-        }
+        if (!res.ok) throw new Error(data.message || "Login failed");
 
         await AsyncStorage.setItem("token", data.accessToken);
         await AsyncStorage.setItem("user", JSON.stringify(data.user));
 
-        navigation.reset({
-          index: 0,
-          routes: [
-            { name: data.user.onboardingCompleted ? "Home" : "Onboarding" },
-          ],
-        });
+        routeAfterLogin(data.user);
       } catch (err) {
         Alert.alert("Google login failed", err.message);
       } finally {
@@ -104,7 +145,7 @@ const Login = ({ navigation }) => {
   }, [response]);
 
   /* ======================================================
-     BIOMETRIC CHECK
+     BIOMETRIC AVAILABILITY CHECK
   ====================================================== */
   useEffect(() => {
     const checkBiometrics = async () => {
@@ -113,22 +154,26 @@ const Login = ({ navigation }) => {
         const enrolled = await LocalAuthentication.isEnrolledAsync();
         const creds = await getBiometricCredentials();
 
-        if (compatible && enrolled && creds) {
+        if (compatible && enrolled && creds?.email) {
           setBiometricAvailable(true);
           setSavedBiometricEmail(creds.email);
+        } else {
+          setBiometricAvailable(false);
         }
-      } catch {}
+      } catch {
+        setBiometricAvailable(false);
+      }
     };
 
     checkBiometrics();
   }, []);
 
   /* ======================================================
-     EMAIL + PASSWORD LOGIN (FIREBASE)
+     EMAIL + PASSWORD LOGIN
   ====================================================== */
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert("Missing", "Enter email and password");
+      Alert.alert("Missing fields", "Enter email and password");
       return;
     }
 
@@ -141,31 +186,26 @@ const Login = ({ navigation }) => {
         password
       );
 
-      const user = result.user;
+      const firebaseUser = result.user;
 
       const res = await fetch(`${API_URL}/auth/sync-firebase-user`, {
         method: "POST",
         headers: headers(),
         body: JSON.stringify({
-          firebaseUid: user.uid,
-          email: user.email,
-          fullName: user.displayName || "",
+          firebaseUid: firebaseUser.uid,
+          email: firebaseUser.email,
+          fullName: firebaseUser.displayName || "",
           provider: "email",
         }),
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message);
+      if (!res.ok) throw new Error(data.message || "Login failed");
 
       await AsyncStorage.setItem("token", data.accessToken);
       await AsyncStorage.setItem("user", JSON.stringify(data.user));
 
-      navigation.reset({
-        index: 0,
-        routes: [
-          { name: data.user.onboardingCompleted ? "Home" : "Onboarding" },
-        ],
-      });
+      routeAfterLogin(data.user);
     } catch (err) {
       Alert.alert("Login failed", err.message);
     } finally {
@@ -198,25 +238,23 @@ const Login = ({ navigation }) => {
       const data = await res.json();
       if (!res.ok) {
         await clearBiometricCredentials();
-        throw new Error("Biometric login failed");
+        throw new Error(data.message || "Biometric login failed");
       }
 
       await AsyncStorage.setItem("token", data.accessToken);
       await AsyncStorage.setItem("user", JSON.stringify(data.user));
 
-      navigation.reset({
-        index: 0,
-        routes: [
-          { name: data.user.onboardingCompleted ? "Home" : "Onboarding" },
-        ],
-      });
+      routeAfterLogin(data.user);
     } catch (err) {
-      Alert.alert("Error", err.message);
+      Alert.alert("Biometric login failed", err.message);
     } finally {
       setLoading(false);
     }
   };
 
+  /* ======================================================
+     UI
+  ====================================================== */
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Welcome Back</Text>
@@ -237,14 +275,22 @@ const Login = ({ navigation }) => {
         onChangeText={setPassword}
       />
 
-      <TouchableOpacity style={styles.primaryButton} onPress={handleLogin}>
-        <Text style={styles.primaryText}>Login</Text>
+      <TouchableOpacity
+        style={styles.primaryButton}
+        onPress={handleLogin}
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.primaryText}>Login</Text>
+        )}
       </TouchableOpacity>
 
       <TouchableOpacity
         style={styles.socialButton}
         onPress={() => promptAsync()}
-        disabled={!request}
+        disabled={!request || loading}
       >
         <Text style={styles.socialText}>Continue with Google</Text>
       </TouchableOpacity>
@@ -253,6 +299,7 @@ const Login = ({ navigation }) => {
         <TouchableOpacity
           style={styles.secondaryButton}
           onPress={handleBiometricLogin}
+          disabled={loading}
         >
           <Text style={styles.secondaryText}>
             Login with biometrics ({savedBiometricEmail})
@@ -263,6 +310,7 @@ const Login = ({ navigation }) => {
       <TouchableOpacity
         style={styles.link}
         onPress={() => navigation.navigate("Register")}
+        disabled={loading}
       >
         <Text style={styles.linkText}>Don’t have an account? Sign up</Text>
       </TouchableOpacity>
@@ -272,6 +320,9 @@ const Login = ({ navigation }) => {
 
 export default Login;
 
+/* ======================================================
+   STYLES
+====================================================== */
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 24, justifyContent: "center" },
   title: {
@@ -309,7 +360,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: "center",
   },
-  secondaryText: {},
+  secondaryText: { fontWeight: "500" },
   link: { marginTop: 20, alignItems: "center" },
   linkText: { color: "#0066cc", fontWeight: "500" },
 });

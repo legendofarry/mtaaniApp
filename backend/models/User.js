@@ -1,49 +1,112 @@
 // backend/models/User.js
+
 const mongoose = require("mongoose");
 
-const locationSchema = new mongoose.Schema({
-  area: { type: String, required: true },
-  estate: { type: String },
-  apartmentName: { type: String },
-  plotNumber: { type: String },
-  block: { type: String },
-  floor: { type: String },
-  houseNumber: { type: String },
-  landmark: { type: String },
-  gps: {
-    lat: { type: Number },
-    lng: { type: Number },
+/* ======================================================
+   LOCATION
+====================================================== */
+const locationSchema = new mongoose.Schema(
+  {
+    area: { type: String, required: true },
+    estate: String,
+    apartmentName: String,
+    plotNumber: String,
+    block: String,
+    floor: String,
+    houseNumber: String,
+    landmark: String,
+    gps: {
+      lat: Number,
+      lng: Number,
+    },
+    structureNumber: String,
   },
-  structureNumber: { type: String },
-});
+  { _id: false }
+);
 
-const biometricsSchema = new mongoose.Schema({
-  enabled: { type: Boolean, default: false },
-  passkeyRaw: { type: String },
-  createdAt: { type: Date },
-  lastUsed: { type: Date },
-});
+/* ======================================================
+   BIOMETRICS / PASSKEY
+====================================================== */
+const biometricsSchema = new mongoose.Schema(
+  {
+    enabled: { type: Boolean, default: false },
 
-const premiumSchema = new mongoose.Schema({
-  status: { type: Boolean, default: false },
-  expiresAt: { type: Date },
-  plan: { type: String, enum: ["basic", "pro", "vendor"] },
-});
+    // 🔐 HASHED passkey (never raw)
+    passkeyHash: { type: String },
 
-const reputationSchema = new mongoose.Schema({
-  score: { type: Number, default: 0 },
-  votes: { type: Number, default: 0 },
-});
+    createdAt: { type: Date },
+    lastUsed: { type: Date },
+  },
+  { _id: false }
+);
 
+/* ======================================================
+   PREMIUM
+====================================================== */
+const premiumSchema = new mongoose.Schema(
+  {
+    status: { type: Boolean, default: false },
+    expiresAt: Date,
+    plan: {
+      type: String,
+      enum: ["basic", "pro", "vendor"],
+      default: "basic",
+    },
+  },
+  { _id: false }
+);
+
+/* ======================================================
+   REPUTATION
+====================================================== */
+const reputationSchema = new mongoose.Schema(
+  {
+    score: { type: Number, default: 0 },
+    votes: { type: Number, default: 0 },
+  },
+  { _id: false }
+);
+
+/* ======================================================
+   USER
+====================================================== */
 const userSchema = new mongoose.Schema(
   {
-    fullName: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
-    phone: { type: String, unique: true, sparse: true },
-    passwordHash: { type: String },
+    fullName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
 
-    // ⭐ NEW: Firebase UID for social auth
-    firebaseUid: { type: String, unique: true, sparse: true },
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      index: true,
+      trim: true,
+    },
+
+    phone: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
+
+    passwordHash: {
+      type: String,
+      select: false,
+    },
+
+    /* ============================================
+       SOCIAL AUTH
+    ============================================ */
+    firebaseUid: {
+      type: String,
+      unique: true,
+      sparse: true,
+      index: true,
+    },
 
     signupMethod: {
       type: String,
@@ -51,24 +114,63 @@ const userSchema = new mongoose.Schema(
       default: "email",
     },
 
-    verified: { type: Boolean, default: false },
-    onboardingCompleted: { type: Boolean, default: false },
+    /* ============================================
+       FLOW FLAGS
+    ============================================ */
+    onboardingCompleted: {
+      type: Boolean,
+      default: false,
+    },
 
-    gender: { type: String, enum: ["male", "female", "other"] },
-    age: { type: Number },
+    // Verification intentionally neutralized
+    verified: {
+      type: Boolean,
+      default: true,
+    },
+
+    /* ============================================
+       PROFILE
+    ============================================ */
+    gender: {
+      type: String,
+      enum: ["male", "female", "other"],
+    },
+
+    age: Number,
 
     location: locationSchema,
 
+    /* ============================================
+       METERS (FUTURE)
+    ============================================ */
     meters: {
       water: [{ type: mongoose.Schema.Types.ObjectId, ref: "Meter" }],
       electricity: [{ type: mongoose.Schema.Types.ObjectId, ref: "Meter" }],
     },
 
-    biometrics: biometricsSchema,
-    premium: premiumSchema,
-    reputation: reputationSchema,
+    /* ============================================
+       SECURITY
+    ============================================ */
+    biometrics: {
+      type: biometricsSchema,
+      default: () => ({ enabled: false }),
+    },
 
-    profileImageUrl: { type: String },
+    /* ============================================
+       APP FEATURES
+    ============================================ */
+    premium: {
+      type: premiumSchema,
+      default: () => ({}),
+    },
+
+    reputation: {
+      type: reputationSchema,
+      default: () => ({}),
+    },
+
+    profileImageUrl: String,
+
     deviceTokens: [{ type: String }],
   },
   { timestamps: true }

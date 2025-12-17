@@ -3,23 +3,18 @@ const express = require("express");
 const router = express.Router();
 const authController = require("../controllers/authController");
 
-// Email / password
+// ==================== BASIC AUTH ====================
 router.post("/register", authController.register);
 router.post("/login", authController.login);
-router.post("/forgot-password", authController.forgotPassword);
-router.post("/reset-password", authController.resetPassword);
 
-// Magic link
-router.post("/send-magic-link", authController.sendMagicLink);
-router.post("/verify-magic-link", authController.verifyMagicLink);
-
-// Firebase / social auth
+// ==================== SOCIAL AUTH ====================
 router.post("/sync-firebase-user", authController.syncFirebaseUser);
 
-// Biometrics
+// ==================== BIOMETRICS ====================
 router.post("/save-passkey", authController.savePasskey);
+router.post("/biometric-login", authController.biometricLogin);
 
-router.get("/verify-email", authController.verifyEmailFromLink);
-router.post("/check-verification", authController.checkVerificationStatus);
+// ==================== ONBOARDING ====================
+router.post("/complete-onboarding", authController.completeOnboarding);
 
 module.exports = router;

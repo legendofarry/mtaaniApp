@@ -18,7 +18,7 @@ import { Button } from "../common/Button";
 import { Ionicons } from "@expo/vector-icons";
 import { API_URL, headers } from "../services/api";
 import LottieWrapper from "../components/LottieWrapper";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useAuth } from "../store/useAuth";
 import {
   signInWithPopup,
   GoogleAuthProvider,
@@ -30,6 +30,8 @@ const SCREEN_HEIGHT = Dimensions.get("window").height;
 
 export default function Register({ navigation }) {
   const { theme } = useTheme();
+  const login = useAuth((state) => state.login);
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -58,7 +60,7 @@ export default function Register({ navigation }) {
     return true;
   };
 
-  // ==================== MANUAL REGISTRATION ====================
+  // ==================== EMAIL/PASSWORD REGISTRATION ====================
   const handleRegister = async () => {
     if (!validateInputs()) return;
 
@@ -70,13 +72,9 @@ export default function Register({ navigation }) {
         fullName: name.trim(),
         email: email.trim().toLowerCase(),
         password,
-        location: {
-          area: "pending",
-        },
       };
 
-      const url = `${API_URL}/auth/register`;
-      const res = await fetch(url, {
+      const res = await fetch(`${API_URL}/auth/register`, {
         method: "POST",
         headers: headers(),
         body: JSON.stringify(payload),
@@ -85,11 +83,13 @@ export default function Register({ navigation }) {
       const data = await res.json();
 
       if (res.ok && data.success) {
-        // Navigate to Verification screen (not OTP)
-        navigation.navigate("Verification", {
-          email: email.trim().toLowerCase(),
+        // ✅ Login user immediately (no verification needed)
+        await login(data.user, data.accessToken);
+
+        // Navigate to onboarding
+        navigation.replace("Onboarding", {
           userId: data.userId,
-          fullName: name.trim(),
+          token: data.accessToken,
         });
       } else {
         if (res.status === 409) {
@@ -142,16 +142,20 @@ export default function Register({ navigation }) {
         throw new Error(data.message || "Google sign-in failed");
       }
 
-      await AsyncStorage.setItem("token", data.accessToken);
-      await AsyncStorage.setItem("user", JSON.stringify(data.user));
+      // ✅ Login user
+      await login(data.user, data.accessToken);
 
-      navigation.replace("Onboarding", {
-        userId: data.userId,
-        token: data.accessToken,
-      });
+      // Check if onboarding is needed
+      if (!data.user.onboardingCompleted) {
+        navigation.replace("Onboarding", {
+          userId: data.userId,
+          token: data.accessToken,
+        });
+      }
+      // Navigation will be handled by Routes.js based on auth state
     } catch (err) {
       console.error("Google sign-in error:", err);
-      setError("Google sign-in failed. Please use email registration.");
+      setError("Google sign-in failed. Please try again or use email.");
     } finally {
       setLoading(false);
     }
@@ -193,16 +197,20 @@ export default function Register({ navigation }) {
         throw new Error(data.message || "Facebook sign-in failed");
       }
 
-      await AsyncStorage.setItem("token", data.accessToken);
-      await AsyncStorage.setItem("user", JSON.stringify(data.user));
+      // ✅ Login user
+      await login(data.user, data.accessToken);
 
-      navigation.replace("Onboarding", {
-        userId: data.userId,
-        token: data.accessToken,
-      });
+      // Check if onboarding is needed
+      if (!data.user.onboardingCompleted) {
+        navigation.replace("Onboarding", {
+          userId: data.userId,
+          token: data.accessToken,
+        });
+      }
+      // Navigation will be handled by Routes.js based on auth state
     } catch (err) {
       console.error("Facebook sign-in error:", err);
-      setError("Facebook sign-in failed. Please use email registration.");
+      setError("Facebook sign-in failed. Please try again or use email.");
     } finally {
       setLoading(false);
     }
@@ -356,7 +364,7 @@ export default function Register({ navigation }) {
             )}
 
             <Button
-              title={loading ? "Creating account..." : "Continue"}
+              title={loading ? "Creating account..." : "Create Account"}
               variant="primary"
               onPress={handleRegister}
               disabled={loading}

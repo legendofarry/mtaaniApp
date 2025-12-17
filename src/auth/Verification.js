@@ -257,10 +257,19 @@ export default function Verification({ route, navigation }) {
           clearInterval(pollerRef.current);
 
           await AsyncStorage.setItem("user", JSON.stringify(data.user));
+          await AsyncStorage.setItem("token", data.accessToken);
 
           navigation.reset({
             index: 0,
-            routes: [{ name: "MainStack" }],
+            routes: [
+              {
+                name: "Onboarding",
+                params: {
+                  userId: data.user.id || data.user._id,
+                  token: data.accessToken,
+                },
+              },
+            ],
           });
         }
       } catch (e) {

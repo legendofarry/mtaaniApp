@@ -6,6 +6,7 @@ const User = require("../models/User");
 const MagicToken = require("../models/MagicToken");
 const logger = require("../config/logger");
 const { Resend } = require("resend");
+const { getApiBaseUrl, getFrontendUrl } = require("../config/urls");
 
 // -------------------- EMAIL (RESEND) --------------------
 let resend = null;
@@ -315,7 +316,7 @@ exports.sendMagicLink = async (req, res) => {
       expiresAt: new Date(Date.now() + 15 * 60 * 1000),
     });
 
-    const magicLink = `${process.env.API_URL}/api/auth/verify-email?token=${token}`;
+    const magicLink = `${getApiBaseUrl()}/api/auth/verify-email?token=${token}`;
 
     if (resend) {
       await resend.emails.send({
@@ -505,7 +506,7 @@ exports.verifyEmailFromLink = async (req, res) => {
     await record.save();
 
     // ✅ NO WHITE SCREEN
-    return res.redirect(`${process.env.FRONTEND_URL}/verified-success`);
+    return res.redirect(`${getFrontendUrl()}/verified-success`);
   } catch (err) {
     logger.error("Email verification error:", err);
     return res.status(500).send("Verification failed");
@@ -515,33 +516,43 @@ exports.verifyEmailFromLink = async (req, res) => {
 exports.checkVerificationStatus = async (req, res) => {
   try {
     const { email } = req.body;
-
     if (!email) {
-      return res.status(400).json({
-        success: false,
-        message: "Email is required",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "Email required" });
     }
 
     const user = await User.findOne({ email });
-
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    }
+
+    // 👇 ONLY issue token when verified
+    if (user.verified) {
+      const token = jwtLib.sign({ id: user._id });
+
+      return res.json({
+        success: true,
+        verified: true,
+        accessToken: token, // ✅ FIX
+        user: {
+          id: user._id.toString(),
+          email: user.email,
+          fullName: user.fullName,
+          verified: true,
+          onboardingCompleted: user.onboardingCompleted || false,
+        },
       });
     }
 
     return res.json({
       success: true,
-      verified: user.verified,
-      user,
+      verified: false,
     });
-  } catch (error) {
-    console.error("Check verification error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Server error",
-    });
+  } catch (err) {
+    console.error("Check verification error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 };

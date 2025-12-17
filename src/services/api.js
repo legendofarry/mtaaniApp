@@ -1,18 +1,39 @@
 // src/services/api.js
 import { Platform } from "react-native";
+import Constants from "expo-constants";
 
-// For local development - update these when you deploy
-const DEV_BASE_URL =
-  Platform.OS === "web"
-    ? "http://localhost:4000" // Web uses localhost
-    : "http://10.23.71.142:4000"; // Mobile uses your PC's IP
+/**
+ * Resolve API base URL safely across:
+ * - Web
+ * - Android emulator
+ * - Real device (LAN)
+ * - Production
+ */
+const getBaseUrl = () => {
+  // 1️⃣ Production / EAS / Expo extra
+  const extraApiUrl = Constants?.expoConfig?.extra?.API_URL;
+  if (extraApiUrl) {
+    return extraApiUrl;
+  }
 
-// TODO: Replace with your production URL when deployed
-const PROD_BASE_URL = "https://mtaaniapp.onrender.com";
+  // 2️⃣ Web (always localhost)
+  if (Platform.OS === "web") {
+    return "http://localhost:4000";
+  }
 
-// Use DEV for now, switch to PROD when deployed
-const BASE_URL = __DEV__ ? DEV_BASE_URL : PROD_BASE_URL;
+  // 3️⃣ Android emulator special localhost
+  if (Platform.OS === "android") {
+    return "http://10.0.2.2:4000";
+  }
 
+  // 4️⃣ Real device fallback (LAN IP – CHANGE IF NEEDED)
+  return "http://10.23.71.142:4000";
+};
+
+// Final base URL
+const BASE_URL = getBaseUrl();
+
+// Public API URL
 export const API_URL = `${BASE_URL}/api`;
 
 // Standard JSON headers (with optional auth token)

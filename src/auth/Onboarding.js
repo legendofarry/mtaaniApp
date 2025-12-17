@@ -31,7 +31,13 @@ const Camera = Platform.OS !== "web" ? require("expo-camera").Camera : null;
 const SCREEN_WIDTH = Dimensions.get("window").width;
 
 export default function Onboarding({ route, navigation }) {
-  const { userId, token: routeToken } = route.params || {};
+  const routeParams = route?.params || {};
+  const routeUserId = routeParams.userId;
+  const routeToken = routeParams.token;
+
+  const [userId, setUserId] = useState(routeUserId || null);
+  const [token, setToken] = useState(routeToken || null);
+
   const { theme } = useTheme();
 
   // profile fields
@@ -69,15 +75,33 @@ export default function Onboarding({ route, navigation }) {
     Platform.OS !== "web" && Camera ? Camera.Constants.FlashMode.off : "off"
   );
 
-  const [token, setToken] = useState(routeToken || null);
-
-  const completeOnboarding = useAuth((state) => state.completeOnboarding);
+  const auth = useAuth();
 
   useEffect(() => {
     if (!token) {
       (async () => {
         const t = await AsyncStorage.getItem("token");
         if (t) setToken(t);
+      })();
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!userId) {
+      (async () => {
+        const storedUser = await AsyncStorage.getItem("user");
+        const storedToken = await AsyncStorage.getItem("token");
+
+        if (storedUser) {
+          const parsed = JSON.parse(storedUser);
+          if (parsed?.id || parsed?._id) {
+            setUserId(parsed.id || parsed._id);
+          }
+        }
+
+        if (!token && storedToken) {
+          setToken(storedToken);
+        }
       })();
     }
   }, []);
@@ -280,6 +304,14 @@ export default function Onboarding({ route, navigation }) {
     console.log("UserId:", userId);
     console.log("Token:", token);
 
+    if (!userId) {
+      Alert.alert(
+        "Session error",
+        "User session not found. Please log in again."
+      );
+      return;
+    }
+
     if (!validate()) return;
     setUploading(true);
 
@@ -383,6 +415,41 @@ export default function Onboarding({ route, navigation }) {
       setUploading(false);
       console.log("Save profile error", err);
       Alert.alert("Network error", "Could not save profile. Try again.");
+    }
+  };
+
+  const completeOnboarding = async () => {
+    try {
+      const storedUser = await AsyncStorage.getItem("user");
+      const storedToken = token || (await AsyncStorage.getItem("token"));
+
+      if (!storedUser || !storedToken) {
+        console.warn("⚠️ Missing session data", { storedUser, storedToken });
+        throw new Error("Session missing");
+      }
+
+      const parsedUser = JSON.parse(storedUser);
+
+      // ✅ Update auth store (THIS drives routing)
+      auth.login(
+        {
+          ...parsedUser,
+          onboardingCompleted: true,
+        },
+        storedToken
+      );
+
+      // ✅ HARD RESET navigation → HOME
+      navigation.reset({
+        index: 0,
+        routes: [{ name: "MainStack" }],
+      });
+    } catch (err) {
+      console.error("Complete onboarding error:", err);
+      Alert.alert(
+        "Error",
+        "Something went wrong finishing onboarding. Please restart the app."
+      );
     }
   };
 

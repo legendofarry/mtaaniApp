@@ -1,3 +1,4 @@
+// src\store\useAuth.js
 import { create } from "zustand";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_URL, headers } from "../services/api";
@@ -28,21 +29,21 @@ export const useAuth = create((set, get) => ({
     }
   },
 
-  login: async ({ token }) => {
-    await AsyncStorage.setItem("token", token);
-    set({ token });
+  login: async (user, accessToken) => {
+    if (!accessToken) {
+      console.warn("⚠️ login called without token");
+      return;
+    }
 
-    const res = await fetch(`${API_URL}/users/me`, {
-      headers: headers(token),
-    });
-
-    const data = await res.json();
-    const user = data.user || data;
-
+    // Persist session
+    await AsyncStorage.setItem("token", accessToken);
     await AsyncStorage.setItem("user", JSON.stringify(user));
+
+    // Update store
     set({
+      token: accessToken,
       user,
-      shouldShowPostAuthSplash: true, // ⭐ after login
+      shouldShowPostAuthSplash: true,
     });
   },
 

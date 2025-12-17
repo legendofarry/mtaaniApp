@@ -49,7 +49,7 @@ exports.register = async (req, res) => {
     const user = await User.create({
       fullName,
       email: emailNormalized,
-      password: hashedPassword,
+      passwordHash: hashedPassword,
       signupMethod: "email",
       verified: false,
       onboardingCompleted: false,
@@ -91,21 +91,26 @@ exports.login = async (req, res) => {
     }
 
     const emailNormalized = email.toLowerCase();
-    const user = await User.findOne({ email: emailNormalized });
+    const user = await User.findOne({ email: emailNormalized }).select(
+      "+passwordHash"
+    );
+    console.log(user);
 
-    if (!user || !user.password) {
+    if (!user) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
+
+    if (!user || !user.passwordHash) {
       return res.status(401).json({
         success: false,
         message: "Invalid email or password",
       });
     }
 
-    const match = await bcrypt.compare(password, user.password);
-    if (!match) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid email or password",
-      });
+    const isMatch = await bcrypt.compare(password, user.passwordHash);
+
+    if (!isMatch) {
+      return res.status(401).json({ message: "Invalid credentials" });
     }
 
     const token = jwtLib.sign({ id: user._id });

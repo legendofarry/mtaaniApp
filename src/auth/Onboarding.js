@@ -431,7 +431,7 @@ export default function Onboarding({ route, navigation }) {
       const parsedUser = JSON.parse(storedUser);
 
       // ✅ Update auth store (THIS drives routing)
-      auth.restoreAuth(
+      auth.login(
         {
           ...parsedUser,
           onboardingCompleted: true,

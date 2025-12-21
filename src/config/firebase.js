@@ -1,45 +1,24 @@
-// src/config/firebase.js
+// src\config\firebase.js
 import { initializeApp } from "firebase/app";
-import { getAuth, initializeAuth } from "firebase/auth";
+import { getAnalytics } from "firebase/analytics";
+import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Platform } from "react-native";
 
-// ✅ Firebase config
 const firebaseConfig = {
-  apiKey: "AIzaSyDITellfquYB_i31doYghix1qWe604JmQI",
-  authDomain: "mtaa-app-9d796.firebaseapp.com",
-  projectId: "mtaa-app-9d796",
-  storageBucket: "mtaa-app-9d796.appspot.com",
-  messagingSenderId: "437462714105",
-  appId: "1:437462714105:web:7299438c6dd63ff6c84428",
+  apiKey: "AIzaSyAUpPCZMArkoJt3dUAUMf63F_uQqRLOWaQ",
+  authDomain: "flux-1eca5.firebaseapp.com",
+  projectId: "flux-1eca5",
+  storageBucket: "flux-1eca5.firebasestorage.app",
+  messagingSenderId: "538706055826",
+  appId: "1:538706055826:web:7a27a61d227c6b8b908c4b",
+  measurementId: "G-B7MQ3815KW",
 };
 
-// ✅ Init Firebase app
-const app = initializeApp(firebaseConfig);
+// ✅ 1. Initialize app FIRST
+export const app = initializeApp(firebaseConfig);
 
-// ✅ Init Auth (platform-safe)
-let auth;
-
-if (Platform.OS === "web") {
-  // 🌐 Web
-  auth = getAuth(app);
-} else {
-  // 📱 Android / iOS
-  const { getReactNativePersistence } = require("firebase/auth");
-
-  auth = initializeAuth(app, {
-    persistence: getReactNativePersistence(AsyncStorage),
-  });
-}
-
-// ✅ Firestore & Storage
-const db = getFirestore(app);
-const storage = getStorage(app);
-
-// ✅ Exports
-export { auth, db, storage };
-export default app;
-
-console.log("🔥 Firebase initialized:", Platform.OS);
+// ✅ 2. Then initialize services
+export const auth = getAuth(app);
+export const db = getFirestore(app);
+export const analytics =
+  typeof window !== "undefined" ? getAnalytics(app) : null;

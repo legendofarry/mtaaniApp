@@ -13,9 +13,8 @@ export const renderHome = async () => {
   app.innerHTML = `
     <nav class="navbar">
       <div class="navbar-content">
-        <a href="/home" class="navbar-brand">MtaaniFlow</a>
+        <a href="/home" class="navbar-brand">Flux</a>
         <ul class="navbar-menu">
-          <li><a href="/home" data-link>Dashboard</a></li>
           <li><a href="#" id="logout-btn">Logout</a></li>
         </ul>
       </div>
@@ -26,7 +25,7 @@ export const renderHome = async () => {
         <h1>Welcome, ${
           userProfile?.displayName || user?.displayName || user?.email || "User"
         }! 👋</h1>
-        <p>Manage your community from the MtaaniFlow dashboard</p>
+        <p>Manage your community from the Flux dashboard</p>
         ${
           userProfile
             ? `
@@ -47,33 +46,6 @@ export const renderHome = async () => {
         `
             : ""
         }
-      </div>
-      
-      <div class="stats-grid">
-        <div class="stat-card">
-          <h3>Total Members</h3>
-          <div class="value">247</div>
-        </div>
-        
-        <div class="stat-card">
-          <h3>Active Events</h3>
-          <div class="value">12</div>
-        </div>
-        
-        <div class="stat-card">
-          <h3>Pending Requests</h3>
-          <div class="value">8</div>
-        </div>
-        
-        <div class="stat-card">
-          <h3>Messages</h3>
-          <div class="value">35</div>
-        </div>
-      </div>
-      
-      <div class="welcome-section mt-3">
-        <h2>Recent Activity</h2>
-        <p class="text-light">No recent activity to display</p>
       </div>
     </div>
   `;

@@ -1,9 +1,14 @@
-// src/app/router.js
 const routes = {};
+let currentLayout = null;
 let currentRoute = null;
 
-export const registerRoute = (path, render, requiresAuth = false) => {
-  routes[path] = { render, requiresAuth };
+export const registerRoute = (
+  path,
+  render,
+  requiresAuth = false,
+  layout = null
+) => {
+  routes[path] = { render, requiresAuth, layout };
 };
 
 export const navigate = (path) => {
@@ -13,22 +18,28 @@ export const navigate = (path) => {
 
 export const renderRoute = async () => {
   const path = window.location.pathname;
-  const route = routes[path] || routes["/"];
+
+  // fallback route
+  const route = routes[path] || routes["/login"];
 
   if (!route) {
     console.error(`No route found for path: ${path}`);
     return;
   }
 
-  // Check authentication if required
+  // 🔐 Auth guard
   if (route.requiresAuth) {
     const { isAuthenticated } = await import("../services/auth.service.js");
-    const authenticated = await isAuthenticated();
 
-    if (!authenticated) {
-      navigate("/login");
-      return;
+    if (!isAuthenticated()) {
+      return navigate("/login");
     }
+  }
+
+  // 🧱 Render layout ONCE
+  if (route.layout && currentLayout !== route.layout) {
+    currentLayout = route.layout;
+    await route.layout();
   }
 
   currentRoute = path;
@@ -42,13 +53,14 @@ export const renderRoute = async () => {
 
 export const getCurrentRoute = () => currentRoute;
 
-// Handle browser back/forward buttons
+// Browser navigation
 window.addEventListener("popstate", renderRoute);
 
-// Handle link clicks for SPA navigation
+// SPA links
 document.addEventListener("click", (e) => {
-  if (e.target.matches("[data-link]")) {
-    e.preventDefault();
-    navigate(e.target.getAttribute("href"));
-  }
+  const link = e.target.closest("[data-link]");
+  if (!link) return;
+
+  e.preventDefault();
+  navigate(link.getAttribute("href"));
 });

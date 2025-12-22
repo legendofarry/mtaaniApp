@@ -2,6 +2,7 @@
 import { initRoutes } from "./app/init.js";
 import { initAuthListener } from "./services/auth.service.js";
 import { initLoadingScreen, showAppContent } from "./utils/loading.js";
+import "/main.css";
 
 // Initialize the application
 const initApp = async () => {

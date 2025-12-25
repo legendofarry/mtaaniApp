@@ -24,7 +24,7 @@ export const renderOnboarding = async () => {
       <h2 class="text-2xl font-semibold mb-2">Welcome — Let's set up your account</h2>
       <p class="text-sm text-gray-600 mb-4">Please provide a phone number, your location and enable device permissions to get the best experience.</p>
 
-      <div class="bg-white rounded-xl shadow p-4">
+      <div class="card rounded-xl p-4">
         <form id="onboard-form" class="space-y-3">
           <div>
             <label class="text-xs text-gray-600">Phone number</label>

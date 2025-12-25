@@ -53,24 +53,19 @@ export const showToast = (message, type = "info", duration = 3500) => {
 
   c.appendChild(el);
 
-  // enter
-  requestAnimationFrame(() => {
-    el.style.opacity = "1";
-    el.style.transform = "translateY(0)";
-  });
+  // enter via CSS class
+  requestAnimationFrame(() => el.classList.add("show"));
 
   const timeout = setTimeout(() => {
     // exit
-    el.style.opacity = "0";
-    el.style.transform = "translateY(-6px)";
-    setTimeout(() => el.remove(), 260);
+    el.classList.remove("show");
+    setTimeout(() => el.remove(), 280);
   }, duration);
 
   // click to dismiss
   el.onclick = () => {
     clearTimeout(timeout);
-    el.style.opacity = "0";
-    el.style.transform = "translateY(-6px)";
+    el.classList.remove("show");
     setTimeout(() => el.remove(), 180);
   };
 

@@ -68,14 +68,14 @@ export const renderWater = async () => {
             </div>
           </div>
 
-          <div class="bg-white rounded-xl shadow p-4 mt-4">
+          <div class="card rounded-xl p-4 mt-4">
             <p class="text-sm text-gray-500">Recent supply pattern</p>
             <div class="mt-2">${spark}</div>
           </div>
         </div>
 
         <div>
-          <div class="bg-white rounded-xl shadow p-4 mb-4">
+          <div class="card rounded-xl p-4 mb-4">
             <p class="text-sm text-gray-500">Summary</p>
             <h3 class="text-lg font-semibold mt-1">Water is ${
               status.status
@@ -85,7 +85,7 @@ export const renderWater = async () => {
             } ${pred.time}</p>
           </div>
 
-          <div class="bg-white rounded-xl shadow p-4">
+          <div class="card rounded-xl p-4">
             <p class="text-sm text-gray-500">Vendors nearby</p>
             <div id="vendors-list" class="mt-2 space-y-2">
               ${vendors.map((v) => renderVendorCard(v)).join("")}

@@ -14,11 +14,11 @@ const createCTA = () => {
   c.id = "install-cta";
   c.className = "install-cta fixed bottom-28 right-6 z-50";
   c.innerHTML = `
-    <button id="install-btn" class="px-4 py-3 rounded-full bg-indigo-600 text-white flex items-center gap-2 shadow-lg animate-bounce">
+    <button id="install-btn" class="btn btn-primary install-animate flex items-center gap-2">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="w-5 h-5"><path fill="currentColor" d="M5 20h14v-2H5v2zm7-18L7 9h3v6h4V9h3l-5-7z"/></svg>
       <span class="font-semibold">Install App</span>
     </button>
-    <button id="dismiss-install" class="ml-2 text-xs text-gray-600">Dismiss</button>
+    <button id="dismiss-install" class="ml-2 text-xs btn-ghost">Dismiss</button>
   `;
   return c;
 };

@@ -24,32 +24,32 @@ export const renderHome = async () => {
       <div id="install-cta-container"></div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div class="bg-white rounded-xl shadow p-4">
-          <p class="text-sm text-gray-500">Estimated electricity left</p>
-          <h3 class="text-3xl font-bold text-blue-600 mt-1">${est}</h3>
-          <p class="text-xs text-gray-400 mt-1">Based on average ${summary.avg} units/day</p>
+        <div class="card rounded-xl p-4">
+          <p class="text-sm text-muted">Estimated electricity left</p>
+          <h3 class="text-3xl font-bold text-accent mt-1">${est}</h3>
+          <p class="text-xs text-muted mt-1">Based on average ${summary.avg} units/day</p>
           <div class="mt-3">${spark}</div>
         </div>
 
-        <div class="bg-white rounded-xl shadow p-4">
-          <p class="text-sm text-gray-500">Next top-up (estimate)</p>
+        <div class="card rounded-xl p-4">
+          <p class="text-sm text-muted">Next top-up (estimate)</p>
           <h3 class="text-xl font-semibold mt-1">${nextTopup}</h3>
-          <p class="text-sm text-gray-400 mt-2">Peak usage: ${summary.peak} units</p>
-          <p class="text-sm text-gray-400 mt-1">14-day avg: ${summary.avg} units/day</p>
+          <p class="text-sm text-muted mt-2">Peak usage: ${summary.peak} units</p>
+          <p class="text-sm text-muted mt-1">14-day avg: ${summary.avg} units/day</p>
         </div>
       </div>
 
       <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div class="bg-white rounded-xl shadow p-3">
-          <p class="text-xs text-gray-500">Daily Consumption (avg)</p>
+        <div class="card rounded-xl p-3">
+          <p class="text-xs text-muted">Daily Consumption (avg)</p>
           <p class="text-lg font-semibold">${summary.avg} units</p>
         </div>
-        <div class="bg-white rounded-xl shadow p-3">
-          <p class="text-xs text-gray-500">Token history (mock)</p>
+        <div class="card rounded-xl p-3">
+          <p class="text-xs text-muted">Token history (mock)</p>
           <p class="text-lg font-semibold">5 purchases</p>
         </div>
-        <div class="bg-white rounded-xl shadow p-3">
-          <p class="text-xs text-gray-500">Budget</p>
+        <div class="card rounded-xl p-3">
+          <p class="text-xs text-muted">Budget</p>
           <p class="text-lg font-semibold">Ksh 1200 / month</p>
         </div>
       </div>

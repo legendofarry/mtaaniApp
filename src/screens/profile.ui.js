@@ -44,7 +44,7 @@ export const renderProfile = async () => {
               ? `<span class="px-2 py-1 rounded bg-green-100 text-green-800 text-sm">Vendor</span>`
               : existingApp && existingApp.status === "pending"
               ? `<span class="px-2 py-1 rounded bg-yellow-100 text-yellow-800 text-sm">Application pending</span>`
-              : `<a href="/vendor/apply" data-link class="ml-4 py-1 px-3 bg-yellow-500 text-white rounded text-sm">Become a Water Vendor</a>`
+              : `<div class="flex items-center gap-2"><a href="/vendor/apply" data-link class="py-1 px-3 bg-yellow-500 text-white rounded text-sm">Become a Water Vendor</a><a href="/share-target" data-link class="py-1 px-3 bg-indigo-600 text-white rounded text-sm">Paste/Share SMS</a></div>`
           }
         </div>
       </div>

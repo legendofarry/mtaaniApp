@@ -21,6 +21,7 @@ export const renderHome = async () => {
   content.innerHTML = `
     <div class="p-4">
       <h2 class="text-2xl font-bold text-gray-900 mb-2">Home</h2>
+      <div id="install-cta-container"></div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div class="bg-white rounded-xl shadow p-4">
@@ -54,4 +55,6 @@ export const renderHome = async () => {
       </div>
     </div>
   `;
+  // init install prompt CTA
+  (await import('../components/installPrompt.js')).startInstallPrompt();
 };

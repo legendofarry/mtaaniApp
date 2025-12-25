@@ -105,9 +105,12 @@ export const renderOnboarding = async () => {
             </div>
           </div>
 
-          <div class="flex justify-end gap-2">
-            <button type="button" id="onboard-cancel" class="px-3 py-2 bg-gray-200 rounded">Cancel</button>
-            <button type="submit" class="px-3 py-2 bg-green-600 text-white rounded">Complete onboarding</button>
+          <div class="flex items-center justify-between gap-2">
+            <div class="text-sm text-gray-500">Or <a href="/share-target" data-link class="text-indigo-600 font-medium">Paste or share an SMS</a> containing your token purchase to save it to your account.</div>
+            <div>
+              <button type="button" id="onboard-cancel" class="px-3 py-2 bg-gray-200 rounded">Cancel</button>
+              <button type="submit" class="px-3 py-2 bg-green-600 text-white rounded">Complete onboarding</button>
+            </div>
           </div>
         </form>
       </div>
@@ -161,17 +164,19 @@ export const renderOnboarding = async () => {
 
     if (document.getElementById("perm-notifs")?.checked) {
       const p = await askNotifPerm();
-      permissions.notifications = p === 'granted';
+      permissions.notifications = p === "granted";
       if (permissions.notifications) {
         // register SW and subscribe to push (VAPID key required)
         await pushService.registerServiceWorker();
-        if (typeof VAPID_PUBLIC_KEY !== 'undefined' && VAPID_PUBLIC_KEY) {
+        if (typeof VAPID_PUBLIC_KEY !== "undefined" && VAPID_PUBLIC_KEY) {
           const sub = await pushService.subscribeToPush(VAPID_PUBLIC_KEY);
           if (sub) {
             await saveSubscriptionForUser(sub);
           }
         } else {
-          console.warn('VAPID_PUBLIC_KEY not configured; push subscription skipped');
+          console.warn(
+            "VAPID_PUBLIC_KEY not configured; push subscription skipped"
+          );
         }
       }
     }

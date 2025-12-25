@@ -359,6 +359,21 @@ body {
   text-align: center;
 }
 
+/* Install CTA */
+.install-cta button#install-btn {
+  padding-left: 14px;
+  padding-right: 14px;
+}
+.install-cta .animate-bounce {
+  animation: install-bounce 1800ms infinite;
+}
+@keyframes install-bounce {
+  0% { transform: translateY(0); }
+  40% { transform: translateY(-8px); }
+  80% { transform: translateY(0); }
+  100% { transform: translateY(0); }
+}
+
 .mt-1 {
   margin-top: 10px;
 }

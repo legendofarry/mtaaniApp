@@ -1,27 +1,35 @@
 // src/main.js
 import { initRoutes } from "./app/init.js";
-import { initAuthListener } from "./services/auth.service.js";
+import { renderRoute, navigate } from "./app/router.js";
+import { initAuthStore, subscribeAuth } from "./services/auth.store.js";
 import { initLoadingScreen, showAppContent } from "./utils/loading.js";
-import "/main.css";
 
-// Initialize the application
 const initApp = async () => {
-  // Initialize loading screen
   initLoadingScreen();
 
-  // Wait for Firebase auth to initialize
-  await initAuthListener();
+  // 🔐 Wait for Firebase auth to initialize
+  await initAuthStore();
 
   // Initialize routes
   initRoutes();
 
-  // Show app content and hide loading screen
-  setTimeout(() => {
-    showAppContent();
-  }, 1000);
+  // 🔁 React to auth changes globally
+  subscribeAuth((user) => {
+    if (!user) {
+      navigate("/login");
+    } else {
+      // Only redirect if user is on auth pages
+      const path = window.location.pathname;
+      if (path === "/login" || path === "/register") {
+        navigate("/home");
+      }
+    }
+  });
+
+  // Initial render
+  renderRoute();
+
+  showAppContent();
 };
 
-// Start the app
-initApp().catch((error) => {
-  console.error("Failed to initialize app:", error);
-});
+initApp().catch(console.error);

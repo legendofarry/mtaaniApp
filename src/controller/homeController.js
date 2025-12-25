@@ -1,5 +1,5 @@
 // src/controllers/homeController.js
-import { logout, getCurrentUser } from "../services/auth.service.js";
+import { logout } from "../services/auth.service.js";
 import { navigate } from "../app/router.js";
 
 export const handleLogout = async (e) => {

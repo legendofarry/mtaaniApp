@@ -2,13 +2,8 @@ const routes = {};
 let currentLayout = null;
 let currentRoute = null;
 
-export const registerRoute = (
-  path,
-  render,
-  requiresAuth = false,
-  layout = null
-) => {
-  routes[path] = { render, requiresAuth, layout };
+export const registerRoute = (path, render, layout = null) => {
+  routes[path] = { render, layout };
 };
 
 export const navigate = (path) => {
@@ -21,20 +16,7 @@ export const renderRoute = async () => {
 
   // fallback route
   const route = routes[path] || routes["/login"];
-
-  if (!route) {
-    console.error(`No route found for path: ${path}`);
-    return;
-  }
-
-  // 🔐 Auth guard
-  if (route.requiresAuth) {
-    const { isAuthenticated } = await import("../services/auth.service.js");
-
-    if (!isAuthenticated()) {
-      return navigate("/login");
-    }
-  }
+  if (!route) return;
 
   // 🧱 Render layout ONCE
   if (route.layout && currentLayout !== route.layout) {
@@ -47,7 +29,7 @@ export const renderRoute = async () => {
   try {
     await route.render();
   } catch (error) {
-    console.error("Error rendering route:", error);
+    console.error("Route render error:", error);
   }
 };
 

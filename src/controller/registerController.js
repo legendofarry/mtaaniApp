@@ -1,5 +1,6 @@
 // src/controllers/registerController.js
 import { register } from "../services/auth.service.js";
+import { createUserProfile } from "../services/user.service.js";
 import { navigate } from "../app/router.js";
 import {
   validateEmail,
@@ -48,6 +49,15 @@ export const handleRegister = async (e) => {
   const result = await register(email, password, displayName);
 
   if (result.success) {
+    try {
+      await createUserProfile(result.user.uid, {
+        email,
+        name: displayName,
+      });
+    } catch (e) {
+      console.warn("Failed creating user profile:", e);
+    }
+
     console.log("Registration successful:", result.user);
     navigate("/home");
   } else {

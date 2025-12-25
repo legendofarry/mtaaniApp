@@ -3,121 +3,45 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
-  onAuthStateChanged,
   updateProfile,
 } from "firebase/auth";
-import { doc, setDoc } from "firebase/firestore";
-import { auth, db } from "../config/firebase.js";
-import { showLoading, hideLoading } from "../utils/loading.js";
+import { auth } from "../config/firebase.js";
 
-let currentUser = null;
-
-// Initialize auth state listener
-export const initAuthListener = () => {
-  return new Promise((resolve) => {
-    onAuthStateChanged(auth, (user) => {
-      currentUser = user;
-      resolve(user);
-    });
-  });
-};
-
-// Check if user is authenticated
-export const isAuthenticated = async () => {
-  return new Promise((resolve) => {
-    onAuthStateChanged(auth, (user) => {
-      resolve(!!user);
-    });
-  });
-};
-
-// Get current user
-export const getCurrentUser = () => {
-  return currentUser || auth.currentUser;
-};
-
-// Login function
+// Return shape: { success: true, user } or { success: false, error }
 export const login = async (email, password) => {
   try {
-    showLoading("Logging in...");
-    const userCredential = await signInWithEmailAndPassword(
-      auth,
-      email,
-      password
-    );
-    currentUser = userCredential.user;
-    hideLoading();
-    return { success: true, user: userCredential.user };
-  } catch (error) {
-    hideLoading();
-    return { success: false, error: getErrorMessage(error.code) };
+    const cred = await signInWithEmailAndPassword(auth, email, password);
+    return { success: true, user: cred.user };
+  } catch (err) {
+    return { success: false, error: err.message || "Login failed" };
   }
 };
 
-// Register function
 export const register = async (email, password, displayName) => {
   try {
-    showLoading("Creating account...");
+    const cred = await createUserWithEmailAndPassword(auth, email, password);
 
-    // Create user in Firebase Auth
-    const userCredential = await createUserWithEmailAndPassword(
-      auth,
-      email,
-      password
-    );
+    if (displayName) {
+      try {
+        await updateProfile(cred.user, { displayName });
+      } catch (e) {
+        // Non-fatal: profile update failed
+        console.warn("updateProfile failed:", e);
+      }
+    }
 
-    // Update profile with display name
-    await updateProfile(userCredential.user, {
-      displayName: displayName,
-    });
+    return { success: true, user: cred.user };
+  } catch (err) {
+    // Normalize common Firebase errors for UI
+    let message = err.message || "Registration failed";
+    if (err.code === "auth/email-already-in-use") {
+      message = "Email already in use";
+    }
 
-    // Add user data to Firestore
-    await setDoc(doc(db, "users", userCredential.user.uid), {
-      uid: userCredential.user.uid,
-      email: userCredential.user.email,
-      displayName: displayName,
-      createdAt: new Date().toISOString(),
-      role: "user",
-      status: "active",
-    });
-
-    currentUser = userCredential.user;
-    hideLoading();
-    return { success: true, user: userCredential.user };
-  } catch (error) {
-    hideLoading();
-    return { success: false, error: getErrorMessage(error.code) };
+    return { success: false, error: message };
   }
 };
 
-// Logout function
 export const logout = async () => {
-  try {
-    showLoading("Logging out...");
-    await signOut(auth);
-    currentUser = null;
-    hideLoading();
-    return { success: true };
-  } catch (error) {
-    hideLoading();
-    return { success: false, error: getErrorMessage(error.code) };
-  }
-};
-
-// Get user-friendly error messages
-const getErrorMessage = (errorCode) => {
-  const errorMessages = {
-    "auth/invalid-email": "Invalid email address",
-    "auth/user-disabled": "This account has been disabled",
-    "auth/user-not-found": "No account found with this email",
-    "auth/wrong-password": "Incorrect password",
-    "auth/email-already-in-use": "Email already in use",
-    "auth/weak-password": "Password should be at least 6 characters",
-    "auth/network-request-failed":
-      "Network error. Please check your connection",
-    "auth/too-many-requests": "Too many attempts. Please try again later",
-    "auth/invalid-credential": "Invalid email or password",
-  };
-
-  return errorMessages[errorCode] || "An error occurred. Please try again";
+  await signOut(auth);
 };

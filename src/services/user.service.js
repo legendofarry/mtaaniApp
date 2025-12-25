@@ -159,3 +159,71 @@ export const submitVendorApplication = async (uid, application) => {
   });
   return { success: true };
 };
+
+/**
+ * Get a vendor application by applicant UID
+ */
+export const getVendorApplication = async (uid) => {
+  try {
+    const ref = doc(db, "vendor_applications", uid);
+    const snap = await getDoc(ref);
+    return snap.exists() ? snap.data() : null;
+  } catch (err) {
+    console.warn("getVendorApplication error:", err);
+    return null;
+  }
+};
+
+/**
+ * Get all vendor applications (admin view)
+ */
+export const getAllVendorApplications = async () => {
+  try {
+    const col = collection(db, "vendor_applications");
+    const snapshot = await getDocs(col);
+    return {
+      success: true,
+      data: snapshot.docs.map((d) => ({ id: d.id, ...d.data() })),
+    };
+  } catch (err) {
+    console.warn("getAllVendorApplications error:", err);
+    return { success: false, error: err.message || String(err) };
+  }
+};
+
+/**
+ * Update vendor application document
+ */
+export const updateVendorApplication = async (uid, updates) => {
+  const ref = doc(db, "vendor_applications", uid);
+  await updateDoc(ref, { ...updates, updatedAt: new Date().toISOString() });
+  return { success: true };
+};
+
+/**
+ * Approve application and mark user as vendor
+ */
+export const approveVendorApplication = async (uid) => {
+  await updateVendorApplication(uid, {
+    status: "approved",
+    reviewedAt: new Date().toISOString(),
+  });
+  // elevate user role
+  await updateUserProfile(uid, {
+    role: "vendor",
+    vendorApprovedAt: new Date().toISOString(),
+  });
+  return { success: true };
+};
+
+/**
+ * Reject application with optional reason
+ */
+export const rejectVendorApplication = async (uid, reason) => {
+  await updateVendorApplication(uid, {
+    status: "rejected",
+    rejectedReason: reason || "",
+    reviewedAt: new Date().toISOString(),
+  });
+  return { success: true };
+};

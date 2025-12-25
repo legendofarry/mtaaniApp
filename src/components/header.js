@@ -13,44 +13,56 @@ export const renderHeader = async () => {
 
   const displayName = user?.displayName || user?.name || "User";
   const initials = getInitials(displayName || user?.email || "U");
-  const email = user?.email || "";
 
   headerContainer.innerHTML = `
-    <header class="fixed top-0 left-0 w-full h-16 bg-white/60 backdrop-blur-md shadow-sm z-50 transition-colors">
-      <div class="max-w-5xl mx-auto h-full px-4 flex items-center justify-evenly gap-6">
-
-        <div id="brand-logo" class="flex items-center gap-3 cursor-pointer select-none">
-          <div class="w-10 h-10 rounded-2xl brand-mark flex items-center justify-center shadow-xl">
-            <span class="text-white font-extrabold">F</span>
+    <header class="fixed top-0 left-0 w-full z-[100] transition-all duration-300 border-b border-slate-100 bg-white/70 backdrop-blur-xl">
+      <div class="max-w-7xl mx-auto h-20 px-6 flex items-center justify-between">
+        
+        <!-- Brand Section -->
+        <div id="brand-logo" class="flex items-center gap-3 cursor-pointer select-none group">
+          <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200 group-hover:scale-110 transition-transform">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+            </svg>
           </div>
-          <div>
-            <div class="text-lg font-bold text-accent">Flux</div>
-            <div class="text-xs text-muted">Energy & Water — Community</div>
+          <div class="hidden sm:block">
+            <h1 class="text-2xl font-black text-slate-900 tracking-tighter leading-none">FLUX</h1>
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Community Utility</span>
+          </div>
         </div>
 
-        <div class="flex items-center gap-4">
-          <div class="hidden md:flex items-center bg-gray-100 rounded-xl px-3 py-1 gap-3 shadow-sm">
-            <input id="header-search" placeholder="Search meters, vendors..." class="bg-transparent outline-none text-sm text-gray-700" />
-            <button id="search-btn" class="text-indigo-600 text-sm">Search</button>
-          </div>
-
-          <button id="notif-btn" class="relative p-2 rounded-xl hover:bg-gray-50 transition-shadow shadow-sm">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-600"><path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0 1 18 14.158V11a6 6 0 1 0-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
-            <span id="notif-dot" class="absolute -top-1 -right-1 w-2.5 h-2.5 notif-dot hidden"></span>
-          </button>
-
-          <div id="profile-btn" class="flex items-center gap-3 cursor-pointer group">
-            <div class="w-10 h-10 rounded-full avatar-mark text-white flex items-center justify-center text-sm font-semibold shadow-xl">${initials}</div>
-            <div class="hidden sm:flex flex-col text-left">
-              <div class="text-sm font-semibold text-accent">${displayName}</div>
-              <div class="text-xs text-muted">${email}</div>
+        <!-- Desktop Search Pill -->
+        <div class="hidden md:flex flex-1 max-w-md mx-8">
+          <div class="relative w-full group">
+            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-indigo-600">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            </div>
+            <input id="header-search" type="text" 
+              placeholder="Search meters or vendors..." 
+              class="w-full bg-slate-100/50 border-2 border-transparent focus:bg-white focus:border-indigo-500 rounded-2xl py-2.5 pl-11 pr-4 text-sm font-medium outline-none transition-all placeholder:text-slate-400" />
+            <div class="absolute inset-y-1 right-1 p-1">
+               <button id="search-btn" class="px-3 h-full bg-slate-200 hover:bg-slate-300 text-slate-600 rounded-xl text-xs font-black uppercase transition-colors">Search</button>
             </div>
           </div>
         </div>
+
+        <!-- Action Group -->
+        <div class="flex items-center gap-2 md:gap-4">
+          
+          <!-- Notifications -->
+          <button id="notif-btn" class="relative w-11 h-11 flex items-center justify-center rounded-2xl bg-white border border-slate-100 text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-all shadow-sm">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+            <span id="notif-dot" class="absolute top-2.5 right-2.5 w-2.5 h-2.5 bg-rose-500 border-2 border-white rounded-full animate-bounce hidden"></span>
+          </button>
+
+        </div>
       </div>
     </header>
+    <!-- Spacer to prevent content from going under the fixed header -->
+    <div class="h-20"></div>
   `;
 
+  // --- Logic ---
   document.getElementById("brand-logo").onclick = () => navigate("/home");
 
   const notifBtn = document.getElementById("notif-btn");
@@ -65,15 +77,17 @@ export const renderHeader = async () => {
     searchBtn.onclick = () => {
       const q = document.getElementById("header-search").value.trim();
       if (!q) return;
-      showToast("Search for: " + q, "info");
+      showToast(`Searching for "${q}"...`, "info");
+    };
+    // Add Enter key listener
+    document.getElementById("header-search").onkeypress = (e) => {
+      if (e.key === "Enter") searchBtn.click();
     };
   }
-
-  document.getElementById("profile-btn").onclick = () => navigate("/profile");
 };
 
 const showNotifications = () => {
-  showToast("No critical alerts right now.", "info");
+  showToast("Your energy usage is optimal today!", "success");
 };
 
 const getInitials = (name = "") => {

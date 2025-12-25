@@ -44,10 +44,10 @@ export const prompt = (message, title = "Input", placeholder = "") => {
     box.innerHTML = `
       <div style="font-weight:700;margin-bottom:8px">${title}</div>
       <div style="color:#374151;margin-bottom:8px">${message}</div>
-      <input id="modal-input" placeholder="${placeholder}" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:12px" />
+      <input id="modal-input" placeholder="${placeholder}" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:9999px;margin-bottom:12px" />
       <div style="display:flex;justify-content:flex-end;gap:8px">
-        <button id="modal-cancel" style="padding:8px 12px;border-radius:8px;border:1px solid #e5e7eb;background:#fff">Cancel</button>
-        <button id="modal-ok" style="padding:8px 12px;border-radius:8px;background:var(--primary-color);color:#fff">OK</button>
+        <button id="modal-cancel" class="btn btn-ghost" style="padding:8px 12px;border:1px solid #e5e7eb;background:#fff">Cancel</button>
+        <button id="modal-ok" class="btn btn-primary" style="padding:8px 12px;">OK</button>
       </div>
     `;
 

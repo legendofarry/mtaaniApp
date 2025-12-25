@@ -15,22 +15,22 @@ export const renderBottomNav = async () => {
   nav.innerHTML = `
     <div class="fixed bottom-4 left-1/2 transform -translate-x-1/2 w-[92%] max-w-3xl bg-white/90 backdrop-blur rounded-2xl shadow-lg px-3 py-2 flex items-center justify-between z-40">
       <button data-path="/home" class="nav-item flex-1 py-2 px-3 flex flex-col items-center justify-center text-gray-500 transition transform rounded-lg hover:bg-gray-50">
-        <div class="p-2 rounded-md text-2xl">🏠</div>
+        <div class="rounded-md text-2xl">🏠</div>
         <span class="text-xs mt-1">Home</span>
       </button>
 
       <button data-path="/water" class="nav-item flex-1 py-2 px-3 flex flex-col items-center justify-center text-gray-500 transition transform rounded-lg hover:bg-gray-50">
-        <div class="relative p-2 rounded-md text-2xl">💧<span id="water-dot" class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full border-2 border-white"></span></div>
+        <div class="relative rounded-md text-2xl">💧<span id="water-dot" class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full border-2 border-white"></span></div>
         <span class="text-xs mt-1">Water</span>
       </button>
 
       <button data-path="/electricity" class="nav-item flex-1 py-2 px-3 flex flex-col items-center justify-center text-gray-500 transition transform rounded-lg hover:bg-gray-50">
-        <div class="p-2 rounded-md text-2xl">⚡</div>
+        <div class="rounded-md text-2xl">⚡</div>
         <span class="text-xs mt-1">Electricity</span>
       </button>
 
       <button data-path="/profile" class="nav-item flex-1 py-2 px-3 flex flex-col items-center justify-center text-gray-500 transition transform rounded-lg hover:bg-gray-50">
-        <div class="p-2 rounded-md text-2xl">👤</div>
+        <div class="rounded-md text-2xl">👤</div>
         <span class="text-xs mt-1">Profile</span>
         ${
           metersCount

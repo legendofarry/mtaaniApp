@@ -1,29 +1,29 @@
 // src\auth\auth.controller.js
-import {
-  registerEmail,
-  loginEmail,
-  loginGoogle,
-} from "../services/auth.service";
+import { register, login } from "../services/auth.service";
 import { createUserProfile, getUserProfile } from "../services/user.service";
 import { showLoading, hideLoading } from "../ui/loading";
 import { navigate } from "../app/router";
+import { showToast } from "../components/toast";
 
 export const register = async ({ email, password, name }) => {
   try {
     showLoading();
 
-    const cred = await registerEmail(email, password);
+    const res = await register(email, password, name);
 
-    await createUserProfile(cred.user.uid, {
-      email,
-      name,
-    });
+    if (!res || !res.success) {
+      showToast(res?.error || "Registration failed", "error");
+      return;
+    }
+
+    try {
+      await createUserProfile(res.user.uid, { email, name });
+    } catch (e) {
+      console.error("createUserProfile failed:", e);
+      showToast("Account created, but profile setup failed.", "warning");
+    }
 
     navigate("/home");
-  } catch (err) {
-    console.error(err);
-
-    alert("Account created, but profile setup failed. Please retry.");
   } finally {
     hideLoading();
   }
@@ -33,35 +33,22 @@ export const login = async ({ email, password }) => {
   try {
     showLoading();
 
-    const cred = await loginEmail(email, password);
-    const profile = await getUserProfile(cred.user.uid);
+    const res = await login(email, password);
 
-    if (!profile.biometricsEnabled) {
-      navigate("/biometrics");
-    } else {
-      navigate("/home");
+    if (!res || !res.success) {
+      showToast(res?.error || "Login failed", "error");
+      return;
     }
-  } catch (err) {
-    alert(err.message);
+
+    try {
+      await getUserProfile(res.user.uid);
+    } catch (e) {
+      // If profile fetch fails, continue — profile creation may be handled elsewhere
+      console.warn("getUserProfile failed:", e);
+    }
+
+    navigate("/home");
   } finally {
     hideLoading();
   }
-};
-
-export const loginWithGoogle = async () => {
-  showLoading();
-  const cred = await loginGoogle();
-  const profile = await getUserProfile(cred.user.uid);
-
-  if (!profile) {
-    await createUserProfile(cred.user.uid, {
-      email: cred.user.email,
-      name: cred.user.displayName,
-    });
-    navigate("/home");
-  } else {
-    navigate(profile.biometricsEnabled ? "/home" : "/biometrics");
-  }
-
-  hideLoading();
 };

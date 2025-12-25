@@ -1,6 +1,7 @@
 import { navigate } from "../app/router.js";
 import { getCurrentUserData } from "../services/user.service.js";
 import { getAuthUser } from "../services/auth.store.js";
+import { showToast } from "../components/toast.js";
 
 export const renderHeader = async () => {
   const headerContainer = document.getElementById("header");
@@ -65,7 +66,7 @@ export const renderHeader = async () => {
     searchBtn.onclick = () => {
       const q = document.getElementById("header-search").value.trim();
       if (!q) return;
-      alert("Search for: " + q);
+      showToast("Search for: " + q, "info");
     };
   }
 
@@ -73,7 +74,7 @@ export const renderHeader = async () => {
 };
 
 const showNotifications = () => {
-  alert("No critical alerts right now.");
+  showToast("No critical alerts right now.", "info");
 };
 
 const getInitials = (name = "") => {

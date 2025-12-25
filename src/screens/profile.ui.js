@@ -3,21 +3,25 @@ import {
   addMeter,
   removeMeter,
   updateMeter,
+  getVendorApplication,
 } from "../services/user.service.js";
 import { handleLogout } from "../controller/homeController.js";
 import { getAuthUser } from "../services/auth.store.js";
 import { showToast } from "../components/toast.js";
 import { confirm, prompt } from "../components/modal.js";
+import { navigate } from "../app/router.js";
 
 export const renderProfile = async () => {
   const content = document.getElementById("content");
   const userData = await getCurrentUserData();
   const user = userData.success ? userData.data : null;
 
+  const existingApp = user
+    ? await getVendorApplication(getAuthUser()?.uid)
+    : null;
+
   // simple placeholder for multi-meter support
-  const meters = user?.meters || [
-    { id: "MTR-001", label: "Home meter", type: "electricity" },
-  ];
+  const meters = user?.meters || [];
 
   content.innerHTML = `
     <div class="flex flex-col h-full p-4">
@@ -35,7 +39,13 @@ export const renderProfile = async () => {
         <p class="text-gray-500 mt-2 mb-1">Role</p>
         <div class="flex items-center justify-between">
           <h3 class="text-gray-900 text-sm">${user?.role || "user"}</h3>
-          <a href="/vendor/apply" data-link class="ml-4 py-1 px-3 bg-yellow-500 text-white rounded text-sm">Become a Water Vendor</a>
+          ${
+            user?.role === "vendor"
+              ? `<span class="px-2 py-1 rounded bg-green-100 text-green-800 text-sm">Vendor</span>`
+              : existingApp && existingApp.status === "pending"
+              ? `<span class="px-2 py-1 rounded bg-yellow-100 text-yellow-800 text-sm">Application pending</span>`
+              : `<a href="/vendor/apply" data-link class="ml-4 py-1 px-3 bg-yellow-500 text-white rounded text-sm">Become a Water Vendor</a>`
+          }
         </div>
       </div>
 
@@ -87,6 +97,15 @@ export const renderProfile = async () => {
   if (addForm) {
     addForm.onsubmit = async (e) => {
       e.preventDefault();
+      const profile = await getCurrentUserData();
+      if (!profile.success || !profile.data.onboarded) {
+        showToast(
+          "Please complete onboarding before adding a meter",
+          "warning"
+        );
+        navigate("/onboarding");
+        return;
+      }
       const id = document.getElementById("meter-id").value.trim();
       const label = document.getElementById("meter-label").value.trim();
       const type = document.getElementById("meter-type").value;

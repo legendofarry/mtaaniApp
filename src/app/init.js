@@ -10,6 +10,9 @@ import { renderWater } from "../screens/water.ui.js";
 import { renderElectricity } from "../screens/electricity.ui.js";
 import { renderProfile } from "../screens/profile.ui.js";
 import { renderVendorApply } from "../screens/vendor.apply.js";
+import { renderAdminVendorApps } from "../screens/admin.vendorApps.js";
+import { renderOnboarding } from "../screens/onboarding.js";
+import { renderShareTarget } from "../screens/share.target.js";
 
 export const initRoutes = () => {
   // Public
@@ -22,4 +25,7 @@ export const initRoutes = () => {
   registerRoute("/electricity", renderElectricity, renderMainLayout);
   registerRoute("/profile", renderProfile, renderMainLayout);
   registerRoute("/vendor/apply", renderVendorApply, renderMainLayout);
+  registerRoute("/admin/vendor-apps", renderAdminVendorApps, renderMainLayout);
+  registerRoute("/onboarding", renderOnboarding, renderMainLayout);
+  registerRoute("/share-target", renderShareTarget, renderMainLayout);
 };

@@ -1,11 +1,33 @@
 import { getAuthUser } from "../services/auth.store.js";
-import { submitVendorApplication } from "../services/user.service.js";
+import {
+  submitVendorApplication,
+  getUserData,
+} from "../services/user.service.js";
+import { getVendorApplication } from "../services/user.service.js";
 import { showToast } from "../components/toast.js";
 import { navigate } from "../app/router.js";
 
 export const renderVendorApply = async () => {
   const content = document.getElementById("content");
   const user = getAuthUser();
+
+  // prevent re-applying if already vendor or pending
+  const existing = await getVendorApplication(user?.uid);
+  const me = await getUserData(user?.uid);
+  if (!me || !me.onboarded) {
+    showToast("Please complete onboarding before applying", "warning");
+    navigate("/onboarding");
+    return;
+  }
+  if (user?.role === "vendor") {
+    content.innerHTML = `<div class="p-4"><h2 class="text-xl font-semibold">You're already a registered vendor</h2><p class="text-sm text-gray-600 mt-2">Thank you — your account has vendor privileges.</p><div class="mt-4"><a href="/profile" data-link class="py-2 px-4 bg-gray-200 rounded">Back to profile</a></div></div>`;
+    return;
+  }
+
+  if (existing && existing.status === "pending") {
+    content.innerHTML = `<div class="p-4"><h2 class="text-xl font-semibold">Application Pending</h2><p class="text-sm text-gray-600 mt-2">We have received your application and will review it shortly.</p><div class="mt-4"><a href="/profile" data-link class="py-2 px-4 bg-gray-200 rounded">Back to profile</a></div></div>`;
+    return;
+  }
 
   content.innerHTML = `
     <div class="p-4 max-w-2xl mx-auto">
@@ -56,12 +78,12 @@ export const renderVendorApply = async () => {
       const uid = user?.uid;
       await submitVendorApplication(uid, { name, phone, location, notes });
       showToast("Application submitted. We'll review it shortly.", "success");
-      navigate('/profile');
+      navigate("/profile");
     } catch (err) {
       console.error(err);
       showToast("Failed to submit application", "error");
     }
   };
 
-  document.getElementById("cancel-apply").onclick = () => navigate('/profile');
+  document.getElementById("cancel-apply").onclick = () => navigate("/profile");
 };

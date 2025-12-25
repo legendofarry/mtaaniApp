@@ -9,6 +9,7 @@ import {
   getSupplyPatternSeries,
 } from "../services/water.service.js";
 import { showToast } from "../components/toast.js";
+import { navigate } from "../app/router.js";
 
 const statusToColor = (s) => {
   if (!s) return "bg-green-100";
@@ -127,7 +128,13 @@ export const renderWater = async () => {
   `;
 
   // Handlers
-  document.getElementById("fab-report").onclick = () => {
+  document.getElementById("fab-report").onclick = async () => {
+    const profile = await getCurrentUserData();
+    if (!profile.success || !profile.data.onboarded) {
+      showToast("Please complete onboarding before reporting", "warning");
+      navigate("/onboarding");
+      return;
+    }
     document.getElementById("report-modal").classList.remove("hidden");
     document.getElementById("report-modal").classList.add("flex");
   };
@@ -141,6 +148,12 @@ export const renderWater = async () => {
     e.preventDefault();
     const type = document.getElementById("report-type").value;
     const notes = document.getElementById("report-notes").value.trim();
+    const profile = await getCurrentUserData();
+    if (!profile.success || !profile.data.onboarded) {
+      showToast("Please complete onboarding before reporting", "warning");
+      navigate("/onboarding");
+      return;
+    }
     await submitReport({ type, notes });
     showToast("Report saved (will sync when online).", "success");
     document.getElementById("report-modal").classList.add("hidden");

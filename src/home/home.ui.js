@@ -56,5 +56,5 @@ export const renderHome = async () => {
     </div>
   `;
   // init install prompt CTA
-  (await import('../components/installPrompt.js')).startInstallPrompt();
+  (await import("../components/installPrompt.js")).startInstallPrompt();
 };

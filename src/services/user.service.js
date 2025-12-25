@@ -217,6 +217,41 @@ export const approveVendorApplication = async (uid) => {
 };
 
 /**
+ * Save a passkey/pk credential to the user's profile
+ */
+export const savePasskey = async (uid, passkey) => {
+  const userRef = doc(db, "users", uid);
+  const userSnap = await getDoc(userRef);
+  const data = userSnap.exists() ? userSnap.data() : {};
+  const passkeys = data.passkeys || [];
+  passkeys.push(passkey);
+  await updateDoc(userRef, { passkeys, updatedAt: new Date().toISOString() });
+  return passkeys;
+};
+
+/**
+ * Get user's saved passkeys
+ */
+export const getPasskeys = async (uid) => {
+  const userRef = doc(db, "users", uid);
+  const snap = await getDoc(userRef);
+  if (!snap.exists()) return [];
+  const data = snap.data();
+  return data.passkeys || [];
+};
+
+/**
+ * Remove a passkey by id
+ */
+export const removePasskey = async (uid, passkeyId) => {
+  const userRef = doc(db, "users", uid);
+  const snap = await getDoc(userRef);
+  const data = snap.exists() ? snap.data() : {};
+  const passkeys = (data.passkeys || []).filter((p) => p.id !== passkeyId);
+  await updateDoc(userRef, { passkeys, updatedAt: new Date().toISOString() });
+  return passkeys;
+};
+/**
  * Reject application with optional reason
  */
 export const rejectVendorApplication = async (uid, reason) => {

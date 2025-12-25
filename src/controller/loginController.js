@@ -52,6 +52,37 @@ export const handleLogin = async (e) => {
         navigate("/home");
         return;
       }
+
+      // After sign-in, check for saved passkeys and prompt the user to enable biometrics
+      try {
+        const { getPasskeys } = await import("../services/user.service.js");
+        const { default: biometricService } = await import(
+          "../services/biometric.service.js"
+        );
+        const { confirm } = await import("../components/modal.js");
+        const { showToast } = await import("../components/toast.js");
+
+        const passkeys = await getPasskeys(result.user.uid);
+        if (!passkeys || passkeys.length === 0) {
+          const enable = await confirm(
+            "Enable biometric / passkey login on this device for faster sign-in?",
+            "Enable biometrics"
+          );
+          if (enable) {
+            const r = await biometricService.registerPasskey({
+              uid: result.user.uid,
+              email: result.user.email,
+            });
+            if (r && r.success) {
+              showToast("Biometrics enabled for this device", "success");
+            } else {
+              showToast("Unable to enable biometrics", "warning");
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("Biometrics check failed:", e);
+      }
     } catch (e) {
       console.warn("Profile check failed:", e);
     }

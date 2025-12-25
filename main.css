@@ -368,10 +368,18 @@ body {
   animation: install-bounce 1800ms infinite;
 }
 @keyframes install-bounce {
-  0% { transform: translateY(0); }
-  40% { transform: translateY(-8px); }
-  80% { transform: translateY(0); }
-  100% { transform: translateY(0); }
+  0% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-8px);
+  }
+  80% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(0);
+  }
 }
 
 .mt-1 {

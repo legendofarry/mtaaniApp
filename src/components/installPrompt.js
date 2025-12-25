@@ -42,7 +42,9 @@ const showCTA = () => {
       deferredPrompt = null;
     } else if (isIOS()) {
       // show instructions on iOS Safari
-      await confirm("To install, tap Share → Add to Home Screen in Safari.\n\nOpen the share menu and choose 'Add to Home Screen'.");
+      await confirm(
+        "To install, tap Share → Add to Home Screen in Safari.\n\nOpen the share menu and choose 'Add to Home Screen'."
+      );
       hideCTA();
     } else {
       showToast("Installation not available in this browser", "warning");

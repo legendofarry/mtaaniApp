@@ -77,6 +77,45 @@ export const getUserProfile = async (uid) => {
 };
 
 /**
+ * Add a meter to a user's profile
+ */
+export const addMeter = async (uid, meter) => {
+  const userRef = doc(db, "users", uid);
+  const userSnap = await getDoc(userRef);
+  const data = userSnap.exists() ? userSnap.data() : {};
+  const meters = data.meters || [];
+  meters.push(meter);
+  await updateDoc(userRef, { meters, updatedAt: new Date().toISOString() });
+  return meters;
+};
+
+/**
+ * Update a meter by id
+ */
+export const updateMeter = async (uid, meterId, updates) => {
+  const userRef = doc(db, "users", uid);
+  const userSnap = await getDoc(userRef);
+  const data = userSnap.exists() ? userSnap.data() : {};
+  const meters = (data.meters || []).map((m) =>
+    m.id === meterId ? { ...m, ...updates } : m
+  );
+  await updateDoc(userRef, { meters, updatedAt: new Date().toISOString() });
+  return meters;
+};
+
+/**
+ * Remove a meter by id
+ */
+export const removeMeter = async (uid, meterId) => {
+  const userRef = doc(db, "users", uid);
+  const userSnap = await getDoc(userRef);
+  const data = userSnap.exists() ? userSnap.data() : {};
+  const meters = (data.meters || []).filter((m) => m.id !== meterId);
+  await updateDoc(userRef, { meters, updatedAt: new Date().toISOString() });
+  return meters;
+};
+
+/**
  * Get all users (admin only – enforce via rules)
  */
 export const getAllUsers = async () => {

@@ -67,11 +67,6 @@ export const renderWater = async () => {
               <div class="w-full h-48 bg-gray-100 flex items-center justify-center text-gray-400">Map Placeholder</div>
             </div>
           </div>
-
-          <div class="card rounded-xl p-4 mt-4">
-            <p class="text-sm text-gray-500">Recent supply pattern</p>
-            <div class="mt-2">${spark}</div>
-          </div>
         </div>
 
         <div>

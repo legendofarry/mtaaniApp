@@ -122,7 +122,6 @@
 
 .btn-ghost {
   background: transparent;
-  border: 1px solid rgba(0, 0, 0, 0.06);
   color: var(--text-dark);
 }
 
@@ -164,7 +163,6 @@
 
 /* Form helpers */
 .form-row {
-  display: flex;
   align-items: center;
   gap: 12px;
 }

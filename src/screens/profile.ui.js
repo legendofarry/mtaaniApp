@@ -85,7 +85,7 @@ export const renderProfile = async () => {
         </form>
       </div>
 
-      <button id="logout-btn" class="mt-auto w-full max-w-xs py-3 rounded-xl bg-red-600 text-white font-semibold text-base shadow-md active:scale-95 transition">Logout</button>
+      <button id="logout-btn" class="my-[30px] w-full max-w-xs py-3 rounded-xl bg-red-600 text-white font-semibold text-base shadow-md active:scale-95 transition">Logout</button>
     </div>
   `;
 

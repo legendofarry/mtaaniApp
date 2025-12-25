@@ -41,6 +41,15 @@ export const handleLogin = async (e) => {
       return;
     }
 
+    // Wait for the Firebase auth listener to stabilize (ensures getAuthUser is populated)
+    try {
+      const { waitForAuth } = await import("../services/auth.store.js");
+      await waitForAuth();
+    } catch (e) {
+      // non-fatal
+      console.warn("waitForAuth failed:", e);
+    }
+
     // Ensure a Firestore profile exists for the user; if missing, create
     try {
       const profile = await getUserProfile(result.user.uid);

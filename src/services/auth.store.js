@@ -34,13 +34,36 @@ export const initAuthStore = () => {
 
 /**
  * Get current authenticated user (sync)
+ * Falls back to a local biometric session when Firebase auth is not set
  */
-export const getAuthUser = () => authUser;
+export const getAuthUser = () => {
+  if (authUser) return authUser;
+  try {
+    const s = localStorage.getItem("webauthn_session");
+    if (!s) return authUser;
+    const parsed = JSON.parse(s);
+    // Return a minimal user-like object so callers can read uid/email
+    return {
+      uid: parsed.uid,
+      email: parsed.email,
+      _biometric: true,
+    };
+  } catch (e) {
+    return authUser;
+  }
+};
 
 /**
  * Check if auth has initialized
  */
 export const isAuthReady = () => initialized;
+
+/**
+ * Emit a local auth change (useful for biometric-only sessions)
+ */
+export const emitLocalAuth = (user) => {
+  listeners.forEach((cb) => cb(user));
+};
 
 /**
  * Wait until auth is ready (useful for screens)

@@ -1,5 +1,6 @@
 // src/auth/login.ui.js
 import { handleLogin, goToRegister } from "../controller/loginController";
+import { navigate } from "../app/router.js";
 
 export const renderLogin = () => {
   const app = document.getElementById("app");
@@ -87,25 +88,47 @@ export const renderLogin = () => {
         return;
       }
 
-      // On success, autofill email if local data exists and focus password
+      // On success, create a short-lived biometric session and navigate directly to home
       const local = localStorage.getItem("webauthn_credential");
       if (local) {
         try {
           const parsed = JSON.parse(local);
-          if (parsed.email) {
-            const emailInput = document.getElementById("email");
-            emailInput.value = parsed.email;
-            document.getElementById("password").focus();
-            showToast(
-              "Biometric succeeded. Enter your password to complete sign-in.",
-              "success"
-            );
+          const session = {
+            uid: parsed.uid,
+            email: parsed.email,
+            createdAt: new Date().toISOString(),
+          };
+          localStorage.setItem("webauthn_session", JSON.stringify(session));
+          // notify app listeners about the change (so UI updates)
+          try {
+            const m = await import("../services/auth.store.js");
+            m.emitLocalAuth({
+              uid: parsed.uid,
+              email: parsed.email,
+              _biometric: true,
+            });
+          } catch (e) {
+            // ignore
           }
+          showToast(
+            "Biometric authentication successful. Signing you in...",
+            "success"
+          );
+          // small delay then navigate
+          setTimeout(() => navigate("/home"), 300);
+          return;
         } catch (e) {
-          // ignore
+          console.warn("biometric session create failed", e);
+          showToast(
+            "Biometric succeeded, but failed to create local session",
+            "warning"
+          );
         }
       } else {
-        showToast("Biometric check passed.", "success");
+        showToast(
+          "Biometric check passed. Please sign in to enable biometric login.",
+          "info"
+        );
       }
     } catch (err) {
       console.warn("Biometric button error:", err);

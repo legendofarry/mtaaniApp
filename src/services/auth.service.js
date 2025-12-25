@@ -43,5 +43,13 @@ export const register = async (email, password, displayName) => {
 };
 
 export const logout = async () => {
+  // Clear any local biometric session when logging out
+  try {
+    localStorage.removeItem("webauthn_session");
+  } catch (e) {
+    // ignore
+  }
+
   await signOut(auth);
+  return { success: true };
 };

@@ -101,9 +101,13 @@
 }
 
 /* Buttons */
+/* Make native buttons and .btn elements pill-shaped */
+button, input[type="button"], input[type="submit"], .btn {
+  border-radius: 9999px !important; /* pill */
+}
+
 .btn {
   padding: 12px 20px;
-  border-radius: var(--radius-md);
   font-weight: 700;
   cursor: pointer;
   transition: transform 260ms var(--ease-smooth),
@@ -123,7 +127,7 @@
 .btn-ghost {
   background: transparent;
   color: var(--text-dark);
-}
+} 
 
 /* Cards & Auth */
 .auth-card {
@@ -470,7 +474,7 @@ body {
 .btn {
   padding: 12px 24px;
   border: none;
-  border-radius: 8px;
+  border-radius: 9999px !important; /* pill */
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;

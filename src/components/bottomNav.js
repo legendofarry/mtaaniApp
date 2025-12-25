@@ -6,7 +6,10 @@ import { getCommunityStatus } from "../services/water.service.js";
 export const renderBottomNav = async () => {
   const nav = document.getElementById("bottom-nav");
   const userRes = await getCurrentUserData();
-  const metersCount = userRes?.success && userRes.data && userRes.data.meters ? userRes.data.meters.length : 0;
+  const metersCount =
+    userRes?.success && userRes.data && userRes.data.meters
+      ? userRes.data.meters.length
+      : 0;
   const waterStatus = getCommunityStatus();
 
   nav.innerHTML = `
@@ -29,25 +32,29 @@ export const renderBottomNav = async () => {
       <button data-path="/profile" class="nav-item flex-1 py-2 px-3 flex flex-col items-center justify-center text-gray-500 transition transform rounded-lg hover:bg-gray-50">
         <div class="p-2 rounded-md text-2xl">👤</div>
         <span class="text-xs mt-1">Profile</span>
-        ${metersCount ? `<span class="absolute mt-[-36px] ml-[28px] text-xs bg-indigo-600 text-white rounded-full px-2">${metersCount}</span>` : ''}
+        ${
+          metersCount
+            ? `<span class="absolute mt-[-36px] ml-[28px] text-xs bg-indigo-600 text-white rounded-full px-2">${metersCount}</span>`
+            : ""
+        }
       </button>
     </div>
   `;
 
   // color water dot
-  const waterDot = document.getElementById('water-dot');
+  const waterDot = document.getElementById("water-dot");
   if (waterDot) {
-    if (waterStatus.status === 'OFF') {
-      waterDot.classList.add('bg-red-500');
-    } else if (waterStatus.status === 'LOW PRESSURE') {
-      waterDot.classList.add('bg-yellow-400');
+    if (waterStatus.status === "OFF") {
+      waterDot.classList.add("bg-red-500");
+    } else if (waterStatus.status === "LOW PRESSURE") {
+      waterDot.classList.add("bg-yellow-400");
     } else {
-      waterDot.classList.add('bg-green-500');
+      waterDot.classList.add("bg-green-500");
     }
   }
 
   // Attach click events
-  nav.querySelectorAll('.nav-item').forEach((btn) => {
+  nav.querySelectorAll(".nav-item").forEach((btn) => {
     btn.onclick = () => {
       navigate(btn.dataset.path);
       setActiveTab();
@@ -60,11 +67,11 @@ export const renderBottomNav = async () => {
 
 // Highlight the active tab with smooth styles
 export const setActiveTab = () => {
-  const current = getCurrentRoute() || '/home';
-  document.querySelectorAll('.nav-item').forEach((btn) => {
-    btn.classList.remove('text-indigo-600', 'scale-105', 'font-semibold');
+  const current = getCurrentRoute() || "/home";
+  document.querySelectorAll(".nav-item").forEach((btn) => {
+    btn.classList.remove("text-indigo-600", "scale-105", "font-semibold");
     if (btn.dataset.path === current) {
-      btn.classList.add('text-indigo-600', 'scale-105', 'font-semibold');
+      btn.classList.add("text-indigo-600", "scale-105", "font-semibold");
     }
   });
 };

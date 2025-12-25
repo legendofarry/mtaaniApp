@@ -33,7 +33,10 @@ export const renderProfile = async () => {
         <h3 class="text-gray-900 text-sm">${user?.email || "-"}</h3>
 
         <p class="text-gray-500 mt-2 mb-1">Role</p>
-        <h3 class="text-gray-900 text-sm">${user?.role || "user"}</h3>
+        <div class="flex items-center justify-between">
+          <h3 class="text-gray-900 text-sm">${user?.role || "user"}</h3>
+          <a href="/vendor/apply" data-link class="ml-4 py-1 px-3 bg-yellow-500 text-white rounded text-sm">Become a Water Vendor</a>
+        </div>
       </div>
 
       <div class="bg-white rounded-xl shadow p-4 mb-4">

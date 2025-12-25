@@ -34,7 +34,7 @@ export const renderVendorApply = async () => {
       <h2 class="text-2xl font-semibold mb-4">Apply to Become a Water Vendor</h2>
       <p class="text-sm text-gray-600 mb-4">Fill out the form below to apply. Applications are reviewed by the team and you'll be notified when approved.</p>
 
-      <div class="bg-white rounded-xl shadow p-4">
+      <div class="card rounded-xl p-4">
         <form id="vendor-apply-form" class="space-y-3">
           <div>
             <label class="text-xs text-gray-600">Business / Vendor Name</label>

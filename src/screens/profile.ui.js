@@ -27,9 +27,9 @@ export const renderProfile = async () => {
     <div class="flex flex-col h-full p-4">
       <h2 class="text-2xl font-bold text-gray-900 mb-4">Profile</h2>
 
-      <div class="bg-white rounded-xl shadow p-4 mb-4">
-        <p class="text-gray-500 mb-1">Name</p>
-        <h3 class="text-lg font-semibold text-gray-900">${
+      <div class="card rounded-xl p-4 mb-4">
+        <p class="text-muted mb-1">Name</p>
+        <h3 class="text-lg font-semibold text-accent">${
           user?.displayName || "User"
         }</h3>
 
@@ -49,8 +49,8 @@ export const renderProfile = async () => {
         </div>
       </div>
 
-      <div class="bg-white rounded-xl shadow p-4 mb-4">
-        <p class="text-gray-500 mb-2">Meters</p>
+      <div class="card rounded-xl p-4 mb-4">
+        <p class="text-muted mb-2">Meters</p>
         <ul id="meters-list" class="text-gray-700 text-sm space-y-2">
           ${meters
             .map(
@@ -61,8 +61,8 @@ export const renderProfile = async () => {
         </ul>
       </div>
 
-      <div class="bg-white rounded-xl shadow p-4 mb-4">
-        <p class="text-gray-500 mb-2">Add Meter</p>
+      <div class="card rounded-xl p-4 mb-4">
+        <p class="text-muted mb-2">Add Meter</p>
         <form id="add-meter-form" class="space-y-2">
           <div>
             <label class="text-xs text-gray-600">Meter ID</label>

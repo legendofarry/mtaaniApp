@@ -17,16 +17,15 @@ export const renderHeader = async () => {
 
   headerContainer.innerHTML = `
     <header class="fixed top-0 left-0 w-full h-16 bg-white/60 backdrop-blur-md shadow-sm z-50 transition-colors">
-      <div class="max-w-5xl mx-auto h-full px-4 flex items-center justify-between">
+      <div class="max-w-5xl mx-auto h-full px-4 flex items-center justify-evenly gap-6">
 
         <div id="brand-logo" class="flex items-center gap-3 cursor-pointer select-none">
-          <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center shadow-md">
+          <div class="w-10 h-10 rounded-2xl brand-mark flex items-center justify-center shadow-xl">
             <span class="text-white font-extrabold">F</span>
           </div>
           <div>
-            <div class="text-lg font-bold text-gray-900">Flux</div>
-            <div class="text-xs text-gray-500">Energy & Water — Community</div>
-          </div>
+            <div class="text-lg font-bold text-accent">Flux</div>
+            <div class="text-xs text-muted">Energy & Water — Community</div>
         </div>
 
         <div class="flex items-center gap-4">
@@ -35,16 +34,16 @@ export const renderHeader = async () => {
             <button id="search-btn" class="text-indigo-600 text-sm">Search</button>
           </div>
 
-          <button id="notif-btn" class="relative p-2 rounded-xl hover:bg-gray-100 transition-shadow shadow-sm">
+          <button id="notif-btn" class="relative p-2 rounded-xl hover:bg-gray-50 transition-shadow shadow-sm">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-600"><path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0 1 18 14.158V11a6 6 0 1 0-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
-            <span id="notif-dot" class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-indigo-600 border-2 border-white rounded-full animate-pulse hidden"></span>
+            <span id="notif-dot" class="absolute -top-1 -right-1 w-2.5 h-2.5 notif-dot hidden"></span>
           </button>
 
           <div id="profile-btn" class="flex items-center gap-3 cursor-pointer group">
-            <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 text-white flex items-center justify-center text-sm font-semibold shadow-md">${initials}</div>
+            <div class="w-10 h-10 rounded-full avatar-mark text-white flex items-center justify-center text-sm font-semibold shadow-xl">${initials}</div>
             <div class="hidden sm:flex flex-col text-left">
-              <div class="text-sm font-semibold text-gray-800">${displayName}</div>
-              <div class="text-xs text-gray-500">${email}</div>
+              <div class="text-sm font-semibold text-accent">${displayName}</div>
+              <div class="text-xs text-muted">${email}</div>
             </div>
           </div>
         </div>

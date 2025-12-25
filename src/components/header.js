@@ -7,88 +7,72 @@ export const renderHeader = async () => {
   const authUser = getAuthUser();
   const userDataRes = await getCurrentUserData();
 
-  const user =
-    userDataRes?.success && userDataRes.data ? userDataRes.data : authUser;
+  const user = userDataRes?.success && userDataRes.data ? userDataRes.data : authUser;
 
-  const displayName = user?.displayName || "User";
-  const initials = getInitials(displayName || user?.email);
-  const hasNotifications = true; // v1 mock (later real)
+  const displayName = user?.displayName || user?.name || "User";
+  const initials = getInitials(displayName || user?.email || "U");
+  const email = user?.email || "";
 
   headerContainer.innerHTML = `
-    <header class="fixed top-0 left-0 w-full h-16 bg-white/70 backdrop-blur-md border-b border-gray-100 flex items-center justify-between px-5 z-50">
+    <header class="fixed top-0 left-0 w-full h-16 bg-white/60 backdrop-blur-md shadow-sm z-50 transition-colors">
+      <div class="max-w-5xl mx-auto h-full px-4 flex items-center justify-between">
 
-      <!-- Brand -->
-      <div class="flex items-center gap-3 cursor-pointer" id="brand-logo">
-        <div class="w-9 h-9 bg-black rounded-xl flex items-center justify-center">
-          <div class="w-3 h-3 bg-white rounded-full"></div>
-        </div>
-        <h1 class="text-xl font-black tracking-tight text-black">
-          Flux
-        </h1>
-      </div>
-
-      <!-- Actions -->
-      <div class="flex items-center gap-4">
-
-        <!-- Search (desktop only) -->
-        <button
-          id="search-btn"
-          class="hidden md:block text-gray-400 hover:text-black transition"
-          aria-label="Search"
-        >
-          🔍
-        </button>
-
-        <!-- Notifications -->
-        <button
-          id="notif-btn"
-          class="relative p-2 rounded-xl hover:bg-gray-100 active:scale-90 transition"
-        >
-          🔔
-          ${
-            hasNotifications
-              ? `<span class="absolute top-1 right-1 w-2.5 h-2.5 bg-indigo-600 border-2 border-white rounded-full animate-pulse"></span>`
-              : ""
-          }
-        </button>
-
-        <!-- Profile -->
-        <button
-          id="profile-btn"
-          class="flex items-center gap-2 p-1 pr-3 bg-gray-50 hover:bg-black rounded-full border border-gray-100 transition active:scale-95"
-        >
-          <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 text-white flex items-center justify-center text-xs font-bold">
-            ${initials}
+        <div id="brand-logo" class="flex items-center gap-3 cursor-pointer select-none">
+          <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center shadow-md">
+            <span class="text-white font-extrabold">F</span>
           </div>
-          <span class="hidden sm:block text-sm font-semibold text-gray-700 group-hover:text-white">
-            ${displayName}
-          </span>
-        </button>
+          <div>
+            <div class="text-lg font-bold text-gray-900">Flux</div>
+            <div class="text-xs text-gray-500">Energy & Water — Community</div>
+          </div>
+        </div>
 
+        <div class="flex items-center gap-4">
+          <div class="hidden md:flex items-center bg-gray-100 rounded-xl px-3 py-1 gap-3 shadow-sm">
+            <input id="header-search" placeholder="Search meters, vendors..." class="bg-transparent outline-none text-sm text-gray-700" />
+            <button id="search-btn" class="text-indigo-600 text-sm">Search</button>
+          </div>
+
+          <button id="notif-btn" class="relative p-2 rounded-xl hover:bg-gray-100 transition-shadow shadow-sm">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-600"><path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0 1 18 14.158V11a6 6 0 1 0-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+            <span id="notif-dot" class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-indigo-600 border-2 border-white rounded-full animate-pulse hidden"></span>
+          </button>
+
+          <div id="profile-btn" class="flex items-center gap-3 cursor-pointer group">
+            <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 text-white flex items-center justify-center text-sm font-semibold shadow-md">${initials}</div>
+            <div class="hidden sm:flex flex-col text-left">
+              <div class="text-sm font-semibold text-gray-800">${displayName}</div>
+              <div class="text-xs text-gray-500">${email}</div>
+            </div>
+          </div>
+        </div>
       </div>
     </header>
   `;
 
-  attachHeaderEvents();
-};
-
-const attachHeaderEvents = () => {
   document.getElementById("brand-logo").onclick = () => navigate("/home");
 
-  document.getElementById("notif-btn").onclick = (e) => {
-    const dot = e.currentTarget.querySelector("span");
-    if (dot) dot.remove();
-    alert("No critical alerts right now.");
+  const notifBtn = document.getElementById("notif-btn");
+  notifBtn.onclick = (e) => {
+    const dot = document.getElementById("notif-dot");
+    if (dot) dot.classList.add("hidden");
+    showNotifications();
   };
 
   const searchBtn = document.getElementById("search-btn");
   if (searchBtn) {
     searchBtn.onclick = () => {
-      console.log("Search coming in v2");
+      const q = document.getElementById("header-search").value.trim();
+      if (!q) return;
+      alert("Search for: " + q);
     };
   }
 
   document.getElementById("profile-btn").onclick = () => navigate("/profile");
+};
+
+const showNotifications = () => {
+  alert("No critical alerts right now.");
 };
 
 const getInitials = (name = "") => {

@@ -48,7 +48,8 @@ export const trySync = async () => {
 export const getCommunityStatus = () => {
   const reports = getSavedReports();
   const recent = reports.filter((r) => {
-    const age = (Date.now() - new Date(r.createdAt).getTime()) / (1000 * 60 * 60);
+    const age =
+      (Date.now() - new Date(r.createdAt).getTime()) / (1000 * 60 * 60);
     return age <= 72; // last 3 days
   });
 
@@ -63,9 +64,33 @@ export const getCommunityStatus = () => {
 export const getVendors = () => {
   // sample static vendors; later replaced by backend
   return [
-    { id: "VND-01", name: "Asha Vendors", route: "Kawangware Rd", price: 12, available: true, contact: "+254700111222", hours: "6am–8pm" },
-    { id: "VND-02", name: "Tanker Express", route: "Market St", price: 9, available: false, contact: "+254700333444", hours: "24/7" },
-    { id: "VND-03", name: "Mama Jerrys", route: "Court 5", price: 10, available: true, contact: "+254700555666", hours: "7am–6pm" },
+    {
+      id: "VND-01",
+      name: "Asha Vendors",
+      route: "Kawangware Rd",
+      price: 12,
+      available: true,
+      contact: "+254700111222",
+      hours: "6am–8pm",
+    },
+    {
+      id: "VND-02",
+      name: "Tanker Express",
+      route: "Market St",
+      price: 9,
+      available: false,
+      contact: "+254700333444",
+      hours: "24/7",
+    },
+    {
+      id: "VND-03",
+      name: "Mama Jerrys",
+      route: "Court 5",
+      price: 10,
+      available: true,
+      contact: "+254700555666",
+      hours: "7am–6pm",
+    },
   ];
 };
 
@@ -76,13 +101,16 @@ export const predictNextSupply = () => {
 
   const freq = {};
   reports.forEach((r) => {
-    const d = new Date(r.createdAt).toLocaleDateString(undefined, { weekday: "long" });
+    const d = new Date(r.createdAt).toLocaleDateString(undefined, {
+      weekday: "long",
+    });
     freq[d] = (freq[d] || 0) + 1;
   });
 
   // choose weekday with highest reports (most active)
   const sorted = Object.keys(freq).sort((a, b) => freq[b] - freq[a]);
-  const day = sorted[0] || new Date().toLocaleDateString(undefined, { weekday: "long" });
+  const day =
+    sorted[0] || new Date().toLocaleDateString(undefined, { weekday: "long" });
   return { day, time: "6:00 AM" };
 };
 
@@ -93,7 +121,9 @@ export const getSupplyPatternSeries = (days = 14) => {
     const d = new Date();
     d.setDate(d.getDate() - i);
     const key = d.toISOString().slice(0, 10);
-    const count = reports.filter((r) => r.createdAt.slice(0, 10) === key).length;
+    const count = reports.filter(
+      (r) => r.createdAt.slice(0, 10) === key
+    ).length;
     series.push(count);
   }
   return series;

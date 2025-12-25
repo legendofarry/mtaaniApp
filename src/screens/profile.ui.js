@@ -1,10 +1,21 @@
-import { getCurrentUserData } from "../services/user.service.js";
+import {
+  getCurrentUserData,
+  addMeter,
+  removeMeter,
+  updateMeter,
+} from "../services/user.service.js";
 import { handleLogout } from "../controller/homeController.js";
+import { getAuthUser } from "../services/auth.store.js";
 
 export const renderProfile = async () => {
   const content = document.getElementById("content");
   const userData = await getCurrentUserData();
   const user = userData.success ? userData.data : null;
+
+  // simple placeholder for multi-meter support
+  const meters = user?.meters || [
+    { id: "MTR-001", label: "Home meter", type: "electricity" },
+  ];
 
   content.innerHTML = `
     <div class="flex flex-col h-full p-4">
@@ -23,14 +34,95 @@ export const renderProfile = async () => {
         <h3 class="text-gray-900 text-sm">${user?.role || "user"}</h3>
       </div>
 
-      <button
-        id="logout-btn"
-        class="mt-auto w-full max-w-xs py-3 rounded-xl bg-red-600 text-white font-semibold text-base shadow-md active:scale-95 transition"
-      >
-        Logout
-      </button>
+      <div class="bg-white rounded-xl shadow p-4 mb-4">
+        <p class="text-gray-500 mb-2">Meters</p>
+        <ul id="meters-list" class="text-gray-700 text-sm space-y-2">
+          ${meters
+            .map(
+              (m) =>
+                `<li class="p-2 border rounded flex items-center justify-between"><div><strong>${m.label}</strong> <span class="text-xs text-gray-500">— ${m.id} (${m.type})</span></div><div class="space-x-2"><button data-edit="${m.id}" class="px-2 py-1 text-xs bg-blue-500 text-white rounded">Edit</button><button data-delete="${m.id}" class="px-2 py-1 text-xs bg-red-500 text-white rounded">Delete</button></div></li>`
+            )
+            .join("")}
+        </ul>
+      </div>
+
+      <div class="bg-white rounded-xl shadow p-4 mb-4">
+        <p class="text-gray-500 mb-2">Add Meter</p>
+        <form id="add-meter-form" class="space-y-2">
+          <div>
+            <label class="text-xs text-gray-600">Meter ID</label>
+            <input id="meter-id" required class="w-full border rounded p-2 mt-1" />
+          </div>
+          <div>
+            <label class="text-xs text-gray-600">Label</label>
+            <input id="meter-label" required class="w-full border rounded p-2 mt-1" />
+          </div>
+          <div>
+            <label class="text-xs text-gray-600">Type</label>
+            <select id="meter-type" class="w-full border rounded p-2 mt-1">
+              <option value="electricity">Electricity</option>
+              <option value="water">Water</option>
+            </select>
+          </div>
+          <div>
+            <button type="submit" class="py-2 px-4 bg-green-600 text-white rounded">Add Meter</button>
+          </div>
+        </form>
+      </div>
+
+      <button id="logout-btn" class="mt-auto w-full max-w-xs py-3 rounded-xl bg-red-600 text-white font-semibold text-base shadow-md active:scale-95 transition">Logout</button>
     </div>
   `;
 
   document.getElementById("logout-btn").onclick = handleLogout;
+  // Attach meter handlers
+  const uid = getAuthUser()?.uid;
+
+  const addForm = document.getElementById("add-meter-form");
+  if (addForm) {
+    addForm.onsubmit = async (e) => {
+      e.preventDefault();
+      const id = document.getElementById("meter-id").value.trim();
+      const label = document.getElementById("meter-label").value.trim();
+      const type = document.getElementById("meter-type").value;
+      if (!id || !label) return alert("Please provide meter id and label");
+      try {
+        await addMeter(uid, { id, label, type });
+        renderProfile();
+      } catch (err) {
+        console.error(err);
+        alert("Failed to add meter");
+      }
+    };
+  }
+
+  // Delete / Edit buttons
+  document.querySelectorAll("[data-delete]").forEach((btn) => {
+    btn.onclick = async () => {
+      const id = btn.getAttribute("data-delete");
+      if (!confirm("Delete meter " + id + "?")) return;
+      try {
+        await removeMeter(uid, id);
+        renderProfile();
+      } catch (err) {
+        console.error(err);
+        alert("Failed to delete meter");
+      }
+    };
+  });
+
+  document.querySelectorAll("[data-edit]").forEach((btn) => {
+    btn.onclick = async () => {
+      const id = btn.getAttribute("data-edit");
+      const newLabel = prompt("New label for " + id + "?");
+      if (!newLabel) return;
+      try {
+        await updateMeter(uid, id, { label: newLabel });
+        renderProfile();
+      } catch (err) {
+        console.error(err);
+        alert("Failed to update meter");
+      }
+    };
+  });
 };

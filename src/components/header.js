@@ -7,7 +7,8 @@ export const renderHeader = async () => {
   const authUser = getAuthUser();
   const userDataRes = await getCurrentUserData();
 
-  const user = userDataRes?.success && userDataRes.data ? userDataRes.data : authUser;
+  const user =
+    userDataRes?.success && userDataRes.data ? userDataRes.data : authUser;
 
   const displayName = user?.displayName || "User";
   const initials = getInitials(displayName || user?.email);

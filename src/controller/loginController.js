@@ -1,6 +1,7 @@
 // src/controllers/loginController.js
 import { login } from "../services/auth.service.js";
 import { navigate } from "../app/router.js";
+import { getUserProfile, createUserProfile } from "../services/user.service.js";
 import {
   validateEmail,
   validatePassword,
@@ -16,7 +17,7 @@ export const handleLogin = async (e) => {
   const email = form.email.value.trim();
   const password = form.password.value;
 
-  // Validate inputs
+  // 1️⃣ Validate inputs (frontend responsibility)
   let hasErrors = false;
 
   if (!validateEmail(email)) {
@@ -31,14 +32,34 @@ export const handleLogin = async (e) => {
 
   if (hasErrors) return;
 
-  // Attempt login
-  const result = await login(email, password);
+  // 2️⃣ Attempt login (auth responsibility)
+  try {
+    const result = await login(email, password);
 
-  if (result.success) {
-    console.log("Login successful:", result.user);
+    if (!result.success) {
+      showFieldError("password", result.error || "Invalid email or password");
+      return;
+    }
+
+    // Ensure a Firestore profile exists for the user; if missing, create
+    try {
+      const profile = await getUserProfile(result.user.uid);
+      if (!profile) {
+        await createUserProfile(result.user.uid, {
+          email: result.user.email,
+          name: result.user.displayName || "",
+        });
+        navigate("/home");
+        return;
+      }
+    } catch (e) {
+      console.warn("Profile check failed:", e);
+    }
+
+    // Fallback: navigate to home
     navigate("/home");
-  } else {
-    showFieldError("password", result.error);
+  } catch (err) {
+    showFieldError("password", "Invalid email or password");
   }
 };
 

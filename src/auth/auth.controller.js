@@ -19,7 +19,7 @@ export const register = async ({ email, password, name }) => {
       name,
     });
 
-    navigate("/onboarding");
+    navigate("/home");
   } catch (err) {
     console.error(err);
 
@@ -53,15 +53,15 @@ export const loginWithGoogle = async () => {
   const cred = await loginGoogle();
   const profile = await getUserProfile(cred.user.uid);
 
-  if (!profile) {
-    await createUserProfile(cred.user.uid, {
-      email: cred.user.email,
-      name: cred.user.displayName,
-    });
-    navigate("/onboarding");
-  } else {
-    navigate(profile.biometricsEnabled ? "/home" : "/biometrics");
-  }
+    if (!profile) {
+      await createUserProfile(cred.user.uid, {
+        email: cred.user.email,
+        name: cred.user.displayName,
+      });
+      navigate("/home");
+    } else {
+      navigate(profile.biometricsEnabled ? "/home" : "/biometrics");
+    }
 
   hideLoading();
 };

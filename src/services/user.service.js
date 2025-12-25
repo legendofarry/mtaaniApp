@@ -3,100 +3,105 @@ import {
   doc,
   getDoc,
   updateDoc,
+  setDoc,
   collection,
   getDocs,
   query,
   where,
 } from "firebase/firestore";
 import { db } from "../config/firebase.js";
-import { getCurrentUser } from "./auth.service.js";
+import { getAuthUser } from "./auth.store.js";
 
-// Get user data from Firestore
+/**
+ * Get user data by UID
+ */
 export const getUserData = async (uid) => {
-  try {
-    const userRef = doc(db, "users", uid);
-    const userSnap = await getDoc(userRef);
+  const userRef = doc(db, "users", uid);
+  const userSnap = await getDoc(userRef);
 
-    if (userSnap.exists()) {
-      return { success: true, data: userSnap.data() };
-    } else {
-      return { success: false, error: "User not found" };
-    }
-  } catch (error) {
-    console.error("Error fetching user data:", error);
-    return { success: false, error: error.message };
+  if (!userSnap.exists()) {
+    return null;
   }
+
+  return userSnap.data();
 };
 
-// Get current user's data from Firestore
+/**
+ * Get currently authenticated user's Firestore profile
+ */
 export const getCurrentUserData = async () => {
-  const user = getCurrentUser();
+  const user = getAuthUser();
+
   if (!user) {
-    return { success: false, error: "No user logged in" };
+    return { success: false, error: "Not authenticated" };
   }
-  return await getUserData(user.uid);
+
+  try {
+    const data = await getUserData(user.uid);
+    if (!data) return { success: false, error: "User not found" };
+    return { success: true, data };
+  } catch (err) {
+    return { success: false, error: err.message || "Failed to get user data" };
+  }
 };
 
-// Update user profile in Firestore
+/**
+ * Update user profile
+ */
 export const updateUserProfile = async (uid, updates) => {
-  try {
-    const userRef = doc(db, "users", uid);
-    await updateDoc(userRef, {
-      ...updates,
-      updatedAt: new Date().toISOString(),
-    });
-    return { success: true };
-  } catch (error) {
-    console.error("Error updating profile:", error);
-    return { success: false, error: error.message };
-  }
+  const userRef = doc(db, "users", uid);
+
+  await updateDoc(userRef, {
+    ...updates,
+    updatedAt: new Date().toISOString(),
+  });
 };
 
-// Get all users (for admin)
+/**
+ * Create a Firestore user profile (id = uid)
+ */
+export const createUserProfile = async (uid, data) => {
+  const userRef = doc(db, "users", uid);
+  await setDoc(userRef, {
+    ...data,
+    role: data.role || "user",
+    createdAt: new Date().toISOString(),
+  });
+};
+
+/**
+ * Helper used by older controllers: returns profile or null
+ */
+export const getUserProfile = async (uid) => {
+  return await getUserData(uid);
+};
+
+/**
+ * Get all users (admin only – enforce via rules)
+ */
 export const getAllUsers = async () => {
-  try {
-    const usersRef = collection(db, "users");
-    const querySnapshot = await getDocs(usersRef);
+  const usersRef = collection(db, "users");
+  const querySnapshot = await getDocs(usersRef);
 
-    const users = [];
-    querySnapshot.forEach((doc) => {
-      users.push(doc.data());
-    });
-
-    return { success: true, users };
-  } catch (error) {
-    console.error("Error fetching users:", error);
-    return { success: false, error: error.message };
-  }
+  return querySnapshot.docs.map((doc) => doc.data());
 };
 
-// Get users by role
+/**
+ * Get users by role
+ */
 export const getUsersByRole = async (role) => {
-  try {
-    const usersRef = collection(db, "users");
-    const q = query(usersRef, where("role", "==", role));
-    const querySnapshot = await getDocs(q);
+  const usersRef = collection(db, "users");
+  const q = query(usersRef, where("role", "==", role));
+  const querySnapshot = await getDocs(q);
 
-    const users = [];
-    querySnapshot.forEach((doc) => {
-      users.push(doc.data());
-    });
-
-    return { success: true, users };
-  } catch (error) {
-    console.error("Error fetching users by role:", error);
-    return { success: false, error: error.message };
-  }
+  return querySnapshot.docs.map((doc) => doc.data());
 };
 
-// Check if user exists in Firestore
+/**
+ * Check if a user document exists
+ */
 export const userExists = async (uid) => {
-  try {
-    const userRef = doc(db, "users", uid);
-    const userSnap = await getDoc(userRef);
-    return userSnap.exists();
-  } catch (error) {
-    console.error("Error checking user existence:", error);
-    return false;
-  }
+  const userRef = doc(db, "users", uid);
+  const userSnap = await getDoc(userRef);
+  return userSnap.exists();
 };

@@ -6,6 +6,8 @@ import {
 } from "../services/user.service.js";
 import { handleLogout } from "../controller/homeController.js";
 import { getAuthUser } from "../services/auth.store.js";
+import { showToast } from "../components/toast.js";
+import { confirm, prompt } from "../components/modal.js";
 
 export const renderProfile = async () => {
   const content = document.getElementById("content");
@@ -85,13 +87,14 @@ export const renderProfile = async () => {
       const id = document.getElementById("meter-id").value.trim();
       const label = document.getElementById("meter-label").value.trim();
       const type = document.getElementById("meter-type").value;
-      if (!id || !label) return alert("Please provide meter id and label");
+      if (!id || !label)
+        return showToast("Please provide meter id and label", "warning");
       try {
         await addMeter(uid, { id, label, type });
         renderProfile();
       } catch (err) {
         console.error(err);
-        alert("Failed to add meter");
+        showToast("Failed to add meter", "error");
       }
     };
   }
@@ -100,13 +103,14 @@ export const renderProfile = async () => {
   document.querySelectorAll("[data-delete]").forEach((btn) => {
     btn.onclick = async () => {
       const id = btn.getAttribute("data-delete");
-      if (!confirm("Delete meter " + id + "?")) return;
+      if (!(await confirm("Delete meter " + id + "?"))) return;
       try {
         await removeMeter(uid, id);
+        showToast("Meter deleted", "success");
         renderProfile();
       } catch (err) {
         console.error(err);
-        alert("Failed to delete meter");
+        showToast("Failed to delete meter", "error");
       }
     };
   });
@@ -114,14 +118,19 @@ export const renderProfile = async () => {
   document.querySelectorAll("[data-edit]").forEach((btn) => {
     btn.onclick = async () => {
       const id = btn.getAttribute("data-edit");
-      const newLabel = prompt("New label for " + id + "?");
+      const newLabel = await prompt(
+        "New label for " + id + "?",
+        "Edit meter",
+        "e.g. Home meter"
+      );
       if (!newLabel) return;
       try {
         await updateMeter(uid, id, { label: newLabel });
+        showToast("Meter updated", "success");
         renderProfile();
       } catch (err) {
         console.error(err);
-        alert("Failed to update meter");
+        showToast("Failed to update meter", "error");
       }
     };
   });

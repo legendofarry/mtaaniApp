@@ -8,6 +8,7 @@ import {
   predictNextSupply,
   getSupplyPatternSeries,
 } from "../services/water.service.js";
+import { showToast } from "../components/toast.js";
 
 const statusToColor = (s) => {
   if (!s) return "bg-green-100";
@@ -33,10 +34,6 @@ const renderVendorCard = (v) => `
       </div>
     </div>
   </div>`;
-
-const showToast = (msg) => {
-  alert(msg);
-};
 
 export const renderWater = async () => {
   const content = document.getElementById("content");
@@ -145,7 +142,7 @@ export const renderWater = async () => {
     const type = document.getElementById("report-type").value;
     const notes = document.getElementById("report-notes").value.trim();
     await submitReport({ type, notes });
-    showToast("Report saved (will sync when online).");
+    showToast("Report saved (will sync when online).", "success");
     document.getElementById("report-modal").classList.add("hidden");
     document.getElementById("report-modal").classList.remove("flex");
     // re-render to update counts

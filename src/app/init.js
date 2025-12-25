@@ -9,6 +9,7 @@ import { renderHome } from "../home/home.ui.js";
 import { renderWater } from "../screens/water.ui.js";
 import { renderElectricity } from "../screens/electricity.ui.js";
 import { renderProfile } from "../screens/profile.ui.js";
+import { renderVendorApply } from "../screens/vendor.apply.js";
 
 export const initRoutes = () => {
   // Public
@@ -20,4 +21,5 @@ export const initRoutes = () => {
   registerRoute("/water", renderWater, renderMainLayout);
   registerRoute("/electricity", renderElectricity, renderMainLayout);
   registerRoute("/profile", renderProfile, renderMainLayout);
+  registerRoute("/vendor/apply", renderVendorApply, renderMainLayout);
 };

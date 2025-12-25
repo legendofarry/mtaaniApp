@@ -144,3 +144,18 @@ export const userExists = async (uid) => {
   const userSnap = await getDoc(userRef);
   return userSnap.exists();
 };
+
+/**
+ * Submit a vendor application for review (water vendors only)
+ */
+export const submitVendorApplication = async (uid, application) => {
+  const appRef = doc(db, "vendor_applications", uid);
+  await setDoc(appRef, {
+    uid,
+    ...application,
+    type: "water",
+    status: "pending",
+    createdAt: new Date().toISOString(),
+  });
+  return { success: true };
+};

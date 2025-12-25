@@ -23,9 +23,13 @@ const renderVendorCard = (v) => `
       <div class="text-xs text-gray-500">${v.route} • Ksh ${v.price}/20L</div>
     </div>
     <div class="text-right">
-      <div class="text-sm ${v.available ? 'text-green-600' : 'text-gray-400'}">${v.available ? 'Available' : 'Unavailable'}</div>
+      <div class="text-sm ${
+        v.available ? "text-green-600" : "text-gray-400"
+      }">${v.available ? "Available" : "Unavailable"}</div>
       <div class="mt-2">
-        <button data-vendor-id="${v.id}" class="px-3 py-1 bg-indigo-600 text-white rounded text-xs">Details</button>
+        <button data-vendor-id="${
+          v.id
+        }" class="px-3 py-1 bg-indigo-600 text-white rounded text-xs">Details</button>
       </div>
     </div>
   </div>`;
@@ -53,10 +57,14 @@ export const renderWater = async () => {
 
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div class="md:col-span-2">
-          <div class="rounded-xl overflow-hidden ${statusToColor(status.status)} border p-4">
+          <div class="rounded-xl overflow-hidden ${statusToColor(
+            status.status
+          )} border p-4">
             <p class="text-sm text-gray-600">Area status</p>
             <h3 class="text-2xl font-bold mt-1">${status.status}</h3>
-            <p class="text-xs text-gray-500 mt-1">${status.count} recent reports</p>
+            <p class="text-xs text-gray-500 mt-1">${
+              status.count
+            } recent reports</p>
             <div class="mt-4 bg-white rounded p-3">
               <div class="w-full h-48 bg-gray-100 flex items-center justify-center text-gray-400">Map Placeholder</div>
             </div>
@@ -71,8 +79,12 @@ export const renderWater = async () => {
         <div>
           <div class="bg-white rounded-xl shadow p-4 mb-4">
             <p class="text-sm text-gray-500">Summary</p>
-            <h3 class="text-lg font-semibold mt-1">Water is ${status.status} in your area.</h3>
-            <p class="text-xs text-gray-400 mt-2">Next predicted supply: ${pred.day} ${pred.time}</p>
+            <h3 class="text-lg font-semibold mt-1">Water is ${
+              status.status
+            } in your area.</h3>
+            <p class="text-xs text-gray-400 mt-2">Next predicted supply: ${
+              pred.day
+            } ${pred.time}</p>
           </div>
 
           <div class="bg-white rounded-xl shadow p-4">

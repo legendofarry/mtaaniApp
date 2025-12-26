@@ -14,4 +14,8 @@ export default defineConfig({
     outDir: "dist",
     sourcemap: true,
   },
+
+  optimizeDeps: {
+    include: ["geofire-common"],
+  },
 });

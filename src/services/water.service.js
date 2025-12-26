@@ -14,7 +14,6 @@ export const getSavedReports = async () => {
     const colRef = collection(db, "waterReports");
     const snapshot = await getDocs(colRef);
     const anga = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    console.log(anga);
     return anga;
   } catch (e) {
     console.warn("Failed reading reports from Firestore", e);

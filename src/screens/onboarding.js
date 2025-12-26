@@ -1,3 +1,4 @@
+// src\screens\onboarding.js
 import { getAuthUser } from "../services/auth.store.js";
 import { updateUserProfile, getUserData } from "../services/user.service.js";
 import { showToast } from "../components/toast.js";
@@ -6,6 +7,7 @@ import pushService from "../services/push.service.js";
 import { requestNotificationPermission as askNotifPerm } from "../utils/permissions.js";
 import { saveSubscriptionForUser } from "../services/push.service.js";
 import { VAPID_PUBLIC_KEY } from "../config/pushConfig.js";
+import { deriveAreaId } from "../utils/location.utils.js";
 
 export const renderOnboarding = async () => {
   const content = document.getElementById("content");
@@ -138,73 +140,77 @@ export const renderOnboarding = async () => {
     navigate("/profile");
 
   document.getElementById("onboard-form").onsubmit = async (e) => {
-    e.preventDefault();
-    const phone = document.getElementById("onboard-phone").value.trim();
-    const county = document.getElementById("onboard-county").value.trim();
-    const area = document.getElementById("onboard-area").value.trim();
-    const zone = document.getElementById("onboard-zone").value.trim();
-    const estate = document.getElementById("onboard-estate").value.trim();
-    const court = document.getElementById("onboard-court").value.trim();
-    const plot = document.getElementById("onboard-plot").value.trim();
-    const lat =
-      parseFloat(document.getElementById("onboard-lat").value) || null;
-    const lng =
-      parseFloat(document.getElementById("onboard-lng").value) || null;
+  e.preventDefault();
+  const phone = document.getElementById("onboard-phone").value.trim();
+  const county = document.getElementById("onboard-county").value.trim();
+  const area = document.getElementById("onboard-area").value.trim();
+  const zone = document.getElementById("onboard-zone").value.trim();
+  const estate = document.getElementById("onboard-estate").value.trim();
+  const court = document.getElementById("onboard-court").value.trim();
+  const plot = document.getElementById("onboard-plot").value.trim();
+  const lat =
+    parseFloat(document.getElementById("onboard-lat").value) || null;
+  const lng =
+    parseFloat(document.getElementById("onboard-lng").value) || null;
 
-    if (!phone || !county || !area)
-      return showToast("Please fill phone, county and area", "warning");
+  if (!phone || !county || !area)
+    return showToast("Please fill phone, county and area", "warning");
 
-    // request notification permission and register push subscription
-    const permissions = {
-      smsRead: !!document.getElementById("perm-sms")?.checked, // simulated on web
-      location: !!document.getElementById("perm-location")?.checked,
-      notifications: false,
-      backgroundSync: !!document.getElementById("perm-bg")?.checked,
-    };
+  // Generate areaId from geohash
+  const areaId = lat && lng ? deriveAreaId(lat, lng) : null;
 
-    if (document.getElementById("perm-notifs")?.checked) {
-      const p = await askNotifPerm();
-      permissions.notifications = p === "granted";
-      if (permissions.notifications) {
-        // register SW and subscribe to push (VAPID key required)
-        await pushService.registerServiceWorker();
-        if (typeof VAPID_PUBLIC_KEY !== "undefined" && VAPID_PUBLIC_KEY) {
-          const sub = await pushService.subscribeToPush(VAPID_PUBLIC_KEY);
-          if (sub) {
-            await saveSubscriptionForUser(sub);
-          }
-        } else {
-          console.warn(
-            "VAPID_PUBLIC_KEY not configured; push subscription skipped"
-          );
+  // request notification permission and register push subscription
+  const permissions = {
+    smsRead: !!document.getElementById("perm-sms")?.checked, // simulated on web
+    location: !!document.getElementById("perm-location")?.checked,
+    notifications: false,
+    backgroundSync: !!document.getElementById("perm-bg")?.checked,
+  };
+
+  if (document.getElementById("perm-notifs")?.checked) {
+    const p = await askNotifPerm();
+    permissions.notifications = p === "granted";
+    if (permissions.notifications) {
+      // register SW and subscribe to push (VAPID key required)
+      await pushService.registerServiceWorker();
+      if (typeof VAPID_PUBLIC_KEY !== "undefined" && VAPID_PUBLIC_KEY) {
+        const sub = await pushService.subscribeToPush(VAPID_PUBLIC_KEY);
+        if (sub) {
+          await saveSubscriptionForUser(sub);
         }
+      } else {
+        console.warn(
+          "VAPID_PUBLIC_KEY not configured; push subscription skipped"
+        );
       }
     }
+  }
 
-    const location = {
-      county,
-      area,
-      zone: zone || undefined,
-      estate: estate || undefined,
-      court: court || undefined,
-      plot: plot || undefined,
-      geo: lat && lng ? { lat, lng } : undefined,
-    };
-
-    try {
-      await updateUserProfile(user.uid, {
-        phone,
-        location,
-        permissions,
-        onboarded: true,
-      });
-      showToast("Onboarding complete", "success");
-      navigate("/profile");
-    } catch (err) {
-      console.error(err);
-      showToast("Failed to complete onboarding", "error");
-    }
+  const location = {
+    county,
+    area,
+    zone: zone || undefined,
+    estate: estate || undefined,
+    court: court || undefined,
+    plot: plot || undefined,
+    geo: lat && lng ? { lat, lng } : undefined,
+    areaId,
   };
+
+  try {
+    await updateUserProfile(user.uid, {
+      phone,
+      location,
+      permissions,
+      onboarded: true,
+    });
+    showToast("Onboarding complete", "success");
+    navigate("/profile");
+  } catch (err) {
+    console.error(err);
+    showToast("Failed to complete onboarding", "error");
+  }
+};
 };
 
 export default renderOnboarding;

@@ -253,13 +253,24 @@ const setupEventListeners = (vendors) => {
 
   document.getElementById("report-form").onsubmit = async (e) => {
     e.preventDefault();
-    await submitReport({
+    const res = await submitReport({
       type: reportTypeInput.value,
       notes: document.getElementById("report-notes").value.trim(),
     });
-    showToast("Community updated!", "success");
-    reportModal.classList.replace("flex", "hidden");
-    renderWater();
+
+    if (res && res.success) {
+      showToast("Community updated!", "success");
+      reportModal.classList.replace("flex", "hidden");
+      renderWater();
+    } else {
+      // if failed to sync, notify user and keep modal open or close based on preference
+      showToast(
+        res?.message || "Report saved locally (will sync when online)",
+        "warning"
+      );
+      reportModal.classList.replace("flex", "hidden");
+      renderWater();
+    }
   };
 
   // Vendor Details

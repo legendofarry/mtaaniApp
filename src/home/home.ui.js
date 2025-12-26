@@ -6,6 +6,9 @@ import {
   sparklineSVG,
 } from "../services/usage.service.js";
 import { navigate } from "../app/router.js";
+// Expose navigate globally for inline onclick handlers used in templates
+// (e.g. onclick="navigate('/water')")
+window.navigate = navigate;
 
 export const renderHome = async () => {
   const content = document.getElementById("content");
@@ -208,3 +211,6 @@ export const renderHome = async () => {
   // init install prompt CTA
   (await import("../components/installPrompt.js")).startInstallPrompt();
 };
+
+// expose renderHome for hot reload or external usage
+export default { renderHome };

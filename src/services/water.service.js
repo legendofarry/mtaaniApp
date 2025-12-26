@@ -25,9 +25,59 @@ export const submitReport = async (report) => {
   reports.push(r);
   saveReports(reports);
 
-  // fire-and-forget sync (simulated)
-  trySync();
-  return r;
+  try {
+    const { createReport } = await import("./resourceReports.service.js");
+    const { getCurrentUserData } = await import("./user.service.js");
+
+    const userRes = await getCurrentUserData();
+    console.log("Current user:", userRes);
+
+    if (!userRes.success || !userRes.data?.uid) {
+      console.warn("Cannot submit report: user not authenticated");
+      return { success: false, message: "User not authenticated" };
+    }
+
+    const user = userRes.data;
+
+    const loc = user.location?.geo;
+    if (!loc || typeof loc.lat !== "number" || typeof loc.lng !== "number") {
+      console.warn("Cannot submit report: missing or invalid location");
+      return { success: false, message: "Valid location required" };
+    }
+
+    const payload = {
+      resource: "water",
+      status: r.type,
+      userId: user.uid,
+      reporterName: user.name || user.displayName || null,
+      location: {
+        latitude: Number(loc.lat),
+        longitude: Number(loc.lng),
+        county: user.location.county || null,
+      },
+      meta: { notes: r.notes || null },
+    };
+
+    const res = await createReport(payload);
+
+    if (res && res.success) {
+      // mark this local report as synced
+      const updated = getSavedReports().map((x) =>
+        x === r ? { ...x, synced: true, remoteId: res.id } : x
+      );
+      saveReports(updated);
+      return { success: true, synced: true, remoteId: res.id };
+    }
+
+    return {
+      success: false,
+      message: res?.message || "Failed to create report",
+    };
+  } catch (e) {
+    console.warn("submitReport sync failed", e.message || e);
+    trySync(); // fire-and-forget
+    return { success: false, message: e.message || String(e) };
+  }
 };
 
 export const trySync = async () => {
@@ -35,17 +85,85 @@ export const trySync = async () => {
   const unsynced = reports.filter((r) => !r.synced);
   if (!unsynced.length) return { ok: true, synced: 0 };
 
-  // simulate network call
-  await new Promise((res) => setTimeout(res, 600));
+  try {
+    const { createReport } = await import("./resourceReports.service.js");
+    const { getCurrentUserData } = await import("./user.service.js");
+    const userRes = await getCurrentUserData();
 
-  // mark all as synced
-  const now = nowIso();
-  const updated = reports.map((r) => ({ ...r, synced: true, syncedAt: now }));
-  saveReports(updated);
-  return { ok: true, synced: unsynced.length };
+    if (!userRes.success || !userRes.data?.uid) {
+      console.warn("Cannot sync reports: user not authenticated");
+      return { ok: false, synced: 0 };
+    }
+
+    const user = userRes.data;
+    const loc = user.location?.geo;
+    if (!loc || typeof loc.lat !== "number" || typeof loc.lng !== "number") {
+      console.warn("Cannot submit report: missing or invalid location");
+      return { success: false, message: "Valid location required" };
+    }
+
+    let synced = 0;
+    const now = nowIso();
+
+    for (const r of unsynced) {
+      try {
+        const payload = {
+          resource: "water",
+          status: r.type,
+          userId: user.uid,
+          reporterName: user.name || user.displayName || null,
+          location: {
+            latitude: Number(user.location.latitude),
+            longitude: Number(user.location.longitude),
+            county: user.location.county || null,
+          },
+          meta: { notes: r.notes || null },
+        };
+
+        const res = await createReport(payload);
+        if (res && res.success) {
+          synced++;
+          r.synced = true;
+          r.remoteId = res.id;
+          r.syncedAt = now;
+        }
+      } catch (e) {
+        console.warn("sync report failed", e.message || e);
+      }
+    }
+
+    saveReports(reports); // save updated synced flags
+    return { ok: true, synced };
+  } catch (e) {
+    console.warn("trySync failed", e.message || e);
+    return { ok: false, synced: 0 };
+  }
 };
 
-export const getCommunityStatus = () => {
+export const getCommunityStatus = async () => {
+  // Prefer server-side aggregated status when available
+  try {
+    const { aggregateStatus } = await import("./resourceReports.service.js");
+    const { getCurrentUserData } = await import("./user.service.js");
+    const userRes = await getCurrentUserData();
+    const user = userRes.success ? userRes.data : null;
+    const center = user?.location
+      ? { lat: user.location.latitude, lng: user.location.longitude }
+      : null;
+
+    const agg = await aggregateStatus({
+      resource: "water",
+      center,
+      radiusKm: 5,
+    });
+    if (agg && agg.finalized !== null) {
+      return { status: agg.finalized, count: agg.total };
+    }
+  } catch (e) {
+    console.warn("aggregateStatus not available", e.message || e);
+  }
+
+  // Fallback to local storage method
   const reports = getSavedReports();
   const recent = reports.filter((r) => {
     const age =

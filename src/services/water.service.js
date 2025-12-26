@@ -72,8 +72,10 @@ export const submitReport = async (report) => {
     const lng = Number(loc.lng);
     const geohash = geohashForLocation([lat, lng]);
     const areaId = geohash.substring(0, 4);
+    const clientReportId = crypto.randomUUID();
 
     const payload = {
+      clientReportId,
       resource: "water",
       status: normalizeStatus(r.type), // ← NORMALIZE STATUS HERE
       userId: user.uid,
@@ -112,8 +114,7 @@ export const submitReport = async (report) => {
     };
   } catch (e) {
     console.warn("submitReport sync failed", e.message || e);
-    trySync(); // fire-and-forget
-    return { success: false, message: e.message || String(e) };
+    return { success: false, message: "Saved locally, will sync later" };
   }
 };
 

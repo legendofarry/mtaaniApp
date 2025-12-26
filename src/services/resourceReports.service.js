@@ -110,18 +110,9 @@ export const createReport = async ({
   try {
     const now = Date.now();
     const all = await getCollection(col);
-    const recentSame = all.find((r) => {
-      return (
-        r.userId === userId &&
-        normalizeStatus(r.status) === normalizedStatus &&
-        new Date(r.createdAt).getTime() + MS_20_MIN > now
-      );
-    });
-    if (recentSame) {
-      return {
-        success: false,
-        message: "Duplicate report: you already reported this status recently",
-      };
+    const existing = all.find((r) => r.clientReportId === meta.clientReportId);
+    if (existing) {
+      return { success: true, id: existing.id };
     }
 
     // Calculate geohash and areaId from coordinates
@@ -134,6 +125,7 @@ export const createReport = async ({
 
     const geohash = geohashForLocation([lat, lng]);
     const areaId = geohash.substring(0, 4); // ≈ 5km precision
+    console.log("handleSubmit called"); // log the number of times the function is called
 
     const payload = {
       userId,

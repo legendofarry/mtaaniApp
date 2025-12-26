@@ -284,7 +284,6 @@ export const renderWater = async () => {
   `;
 
   setupEventListeners(vendors);
-  trySync();
 };
 
 /**

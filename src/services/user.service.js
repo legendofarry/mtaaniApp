@@ -23,7 +23,7 @@ export const getUserData = async (uid) => {
     return null;
   }
 
-  return userSnap.data();
+  return { uid: userSnap.id, ...userSnap.data() }; // <-- add uid here
 };
 
 /**

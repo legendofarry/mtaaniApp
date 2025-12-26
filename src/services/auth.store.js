@@ -39,7 +39,7 @@ export const initAuthStore = () => {
 export const getAuthUser = () => {
   if (authUser) return authUser;
   try {
-    const s = localStorage.getItem("webauthn_session");
+    const s = localStorage.getItem("webauthn_credential");
     if (!s) return authUser;
     const parsed = JSON.parse(s);
     // Return a minimal user-like object so callers can read uid/email

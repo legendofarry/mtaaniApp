@@ -238,6 +238,23 @@ export const fetchNearbyReports = async ({
   return list;
 };
 
+export const fetchAreaReports = async ({ resource = "water", areaId } = {}) => {
+  if (!areaId) return [];
+
+  const col = COLLECTION_NAME(resource);
+  const all = await getCollection(col);
+
+  const now = Date.now();
+
+  return all.filter((r) => {
+    // not expired
+    if (new Date(r.expiresAt).getTime() <= now) return false;
+
+    // STRICT areaId match
+    return r.areaId === areaId;
+  });
+};
+
 export const aggregateStatus = async ({
   resource = "water",
   userLocation = null,
@@ -297,6 +314,53 @@ export const aggregateStatus = async ({
     finalized,
     total: list.length,
     neighborsWithSameStatus,
+    allReports: list,
+  };
+};
+
+export const aggregateAreaStatus = async ({
+  resource = "water",
+  areaId,
+} = {}) => {
+  if (!areaId) {
+    return {
+      finalized: null,
+      counts: {},
+      total: 0,
+      neighborsWithSameStatus: 0,
+      allReports: [],
+    };
+  }
+
+  const list = await fetchAreaReports({ resource, areaId });
+
+  const counts = {};
+  list.forEach((r) => {
+    const normalized = normalizeStatus(r.status);
+    counts[normalized] = (counts[normalized] || 0) + 1;
+  });
+
+  if (!list.length) {
+    return {
+      finalized: null,
+      counts,
+      total: 0,
+      neighborsWithSameStatus: 0,
+      allReports: [],
+    };
+  }
+
+  // 5+ rule
+  const highVolume = Object.entries(counts).find(([, c]) => c >= 5);
+  const finalized = highVolume
+    ? highVolume[0]
+    : Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+
+  return {
+    finalized,
+    counts,
+    total: list.length,
+    neighborsWithSameStatus: counts[finalized] || 0,
     allReports: list,
   };
 };

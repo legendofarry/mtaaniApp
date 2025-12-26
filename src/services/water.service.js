@@ -3,6 +3,7 @@
 
 import { getFirestore, collection, getDocs } from "firebase/firestore";
 import { geohashForLocation } from "geofire-common";
+const { aggregateAreaStatus } = await import("./resourceReports.service.js");
 
 const db = getFirestore();
 
@@ -238,10 +239,9 @@ export const getCommunityStatus = async (radiusKm = 5) => {
       plot: user.location.plot || null,
     };
 
-    const agg = await aggregateStatus({
+    const agg = await aggregateAreaStatus({
       resource: "water",
-      userLocation,
-      radiusKm,
+      areaId: userAreaId,
     });
 
     if (agg && agg.finalized !== null) {

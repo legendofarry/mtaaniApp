@@ -1,6 +1,7 @@
 // src/services/resourceReports.service.js
 import { addDocument, getCollection } from "./firestore.service.js";
 import { serverTimestamp, Timestamp } from "firebase/firestore";
+import { geohashForLocation } from "geofire-common";
 
 const MS_MIN = 60 * 1000;
 const MS_HOUR = 60 * MS_MIN;
@@ -9,6 +10,18 @@ const MS_24_HOURS = 24 * MS_HOUR;
 
 const COLLECTION_NAME = (resource) =>
   resource === "electricity" ? "electricityReports" : "waterReports";
+
+// Normalize status to handle variations
+const normalizeStatus = (status) => {
+  if (!status) return "ON";
+  const s = status.toString().toUpperCase().trim();
+
+  // Normalize variations
+  if (s === "LOW" || s === "LOW PRESSURE") return "LOW PRESSURE";
+  if (s === "DIRTY" || s === "DIRTY WATER") return "DIRTY WATER";
+
+  return s; // ON, OFF, or other
+};
 
 // Haversine formula to compute distance (km)
 const haversineKm = (lat1, lon1, lat2, lon2) => {
@@ -27,11 +40,16 @@ const haversineKm = (lat1, lon1, lat2, lon2) => {
 };
 
 /**
- * Check if two locations match based on detailed location fields
- * Priority: area > estate > zone > court
+ * Check if two locations match based on areaId (geohash prefix)
+ * Priority: areaId > area/estate > geo distance
  */
 const isMatchingLocation = (loc1, loc2, radiusKm = 5) => {
-  // If both have area and they match, that's a strong match
+  // PRIMARY: Match by areaId (geohash-based, ~5km areas)
+  if (loc1.areaId && loc2.areaId && loc1.areaId === loc2.areaId) {
+    return true;
+  }
+
+  // SECONDARY: Match by area/estate if available
   if (loc1.area && loc2.area && loc1.area === loc2.area) {
     // Further refine by estate if available
     if (loc1.estate && loc2.estate) {
@@ -45,7 +63,18 @@ const isMatchingLocation = (loc1, loc2, radiusKm = 5) => {
     return true;
   }
 
-  // If areas don't match or aren't available, fall back to geo distance
+  // FALLBACK: Calculate distance if both have coordinates
+  if (loc1.lat && loc1.lng && loc2.lat && loc2.lng) {
+    const dist = haversineKm(
+      parseFloat(loc1.lat),
+      parseFloat(loc1.lng),
+      parseFloat(loc2.lat),
+      parseFloat(loc2.lng)
+    );
+    return dist <= radiusKm;
+  }
+
+  // Also check latitude/longitude format (some reports use this)
   if (loc1.latitude && loc1.longitude && loc2.latitude && loc2.longitude) {
     const dist = haversineKm(
       parseFloat(loc1.latitude),
@@ -74,6 +103,9 @@ export const createReport = async ({
   // use location param; prefer fully-specified location
   if (!location) return { success: false, message: "location required" };
 
+  // Normalize status before processing
+  const normalizedStatus = normalizeStatus(status);
+
   // enforce duplicate rule: no same user + same status within 20 minutes
   try {
     const now = Date.now();
@@ -81,7 +113,7 @@ export const createReport = async ({
     const recentSame = all.find((r) => {
       return (
         r.userId === userId &&
-        r.status === status &&
+        normalizeStatus(r.status) === normalizedStatus &&
         new Date(r.createdAt).getTime() + MS_20_MIN > now
       );
     });
@@ -92,12 +124,23 @@ export const createReport = async ({
       };
     }
 
+    // Calculate geohash and areaId from coordinates
+    const lat = Number(location.latitude || location.lat);
+    const lng = Number(location.longitude || location.lng);
+
+    if (isNaN(lat) || isNaN(lng)) {
+      return { success: false, message: "Valid coordinates required" };
+    }
+
+    const geohash = geohashForLocation([lat, lng]);
+    const areaId = geohash.substring(0, 4); // ≈ 5km precision
+
     const payload = {
       userId,
       reporterName: reporterName || null,
       location: {
-        latitude: Number(location.latitude),
-        longitude: Number(location.longitude),
+        latitude: lat,
+        longitude: lng,
         county: location.county || null,
         area: location.area || null,
         estate: location.estate || null,
@@ -105,11 +148,15 @@ export const createReport = async ({
         court: location.court || null,
         plot: location.plot || null,
       },
-      status,
+      lat,
+      lng,
+      geohash,
+      areaId,
+      status: normalizedStatus, // Store normalized status
+      resource,
       meta,
       createdAt: serverTimestamp(),
       expiresAt: Timestamp.fromDate(new Date(Date.now() + MS_24_HOURS)),
-      resource,
     };
 
     const docRef = await addDocument(col, payload);
@@ -117,14 +164,15 @@ export const createReport = async ({
     // also add a generic notifications doc (so UI that reads notifications can surface it)
     try {
       await addDocument("notifications", {
-        title: `${resource} report: ${status}`,
+        title: `${resource} report: ${normalizedStatus}`,
         message: payload.reporterName
-          ? `${payload.reporterName} reported ${status}`
-          : `Report: ${status}`,
+          ? `${payload.reporterName} reported ${normalizedStatus}`
+          : `Report: ${normalizedStatus}`,
         reporterUid: userId,
         reporterName: payload.reporterName || null,
         targetCounty: location?.county || null,
         targetArea: location?.area || null,
+        areaId,
         resource,
         reportRef: `${col}/${docRef.id}`,
         createdAt: serverTimestamp(),
@@ -159,23 +207,36 @@ export const fetchNearbyReports = async ({
 
   const list = recent
     .filter((r) => {
-      if (!r.location) return false;
-      return isMatchingLocation(userLocation, r.location, radiusKm);
+      if (!r.location && !r.lat && !r.lng) return false;
+
+      // Create a location object for matching
+      const reportLoc = {
+        areaId: r.areaId,
+        area: r.location?.area,
+        estate: r.location?.estate,
+        zone: r.location?.zone,
+        lat: r.lat || r.location?.latitude,
+        lng: r.lng || r.location?.longitude,
+        latitude: r.lat || r.location?.latitude,
+        longitude: r.lng || r.location?.longitude,
+      };
+
+      return isMatchingLocation(userLocation, reportLoc, radiusKm);
     })
     .map((r) => {
       // Calculate distance if both have geo coordinates
       let distanceKm = null;
-      if (
-        userLocation.latitude &&
-        userLocation.longitude &&
-        r.location.latitude &&
-        r.location.longitude
-      ) {
+      const userLat = userLocation.lat || userLocation.latitude;
+      const userLng = userLocation.lng || userLocation.longitude;
+      const reportLat = r.lat || r.location?.latitude;
+      const reportLng = r.lng || r.location?.longitude;
+
+      if (userLat && userLng && reportLat && reportLng) {
         distanceKm = haversineKm(
-          parseFloat(userLocation.latitude),
-          parseFloat(userLocation.longitude),
-          parseFloat(r.location.latitude),
-          parseFloat(r.location.longitude)
+          parseFloat(userLat),
+          parseFloat(userLng),
+          parseFloat(reportLat),
+          parseFloat(reportLng)
         );
       }
       return { ...r, distanceKm };
@@ -192,7 +253,12 @@ export const aggregateStatus = async ({
 } = {}) => {
   const list = await fetchNearbyReports({ resource, userLocation, radiusKm });
   const counts = {};
-  list.forEach((r) => (counts[r.status] = (counts[r.status] || 0) + 1));
+
+  // Count by normalized status
+  list.forEach((r) => {
+    const normalized = normalizeStatus(r.status);
+    counts[normalized] = (counts[normalized] || 0) + 1;
+  });
 
   let finalized = null;
   const entries = Object.entries(counts);
@@ -221,7 +287,7 @@ export const aggregateStatus = async ({
       // tie-breaker: pick status with most recent report among tied statuses
       const latestByStatus = {};
       for (const t of tied) {
-        const item = list.find((r) => r.status === t);
+        const item = list.find((r) => normalizeStatus(r.status) === t);
         if (item) latestByStatus[t] = new Date(item.createdAt).getTime();
       }
       const sorted = Object.entries(latestByStatus).sort((a, b) => b[1] - a[1]);
@@ -231,7 +297,7 @@ export const aggregateStatus = async ({
 
   // Count neighbors who reported the SAME status as finalized
   const neighborsWithSameStatus = list.filter(
-    (r) => r.status === finalized
+    (r) => normalizeStatus(r.status) === finalized
   ).length;
 
   return {

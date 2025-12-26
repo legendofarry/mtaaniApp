@@ -59,19 +59,13 @@ export const renderProfile = async () => {
           ? `
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <a href="/vendor/apply" data-link class="group p-6 bg-slate-900 rounded-[2rem] text-white flex items-center justify-between hover:bg-slate-800 transition-all">
-          <div>
-            <p class="font-bold text-lg">Become a Vendor</p>
-            <p class="text-slate-400 text-xs">Sell water to your community</p>
-          </div>
+          <div><p class="font-bold text-lg">Become a Vendor</p><p class="text-slate-400 text-xs">Sell water to your community</p></div>
           <div class="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center group-hover:bg-indigo-500 transition-colors">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
           </div>
         </a>
         <a href="/share-target" data-link class="group p-6 bg-white border border-slate-100 rounded-[2rem] text-slate-900 flex items-center justify-between hover:border-indigo-200 transition-all">
-          <div>
-            <p class="font-bold text-lg">Sync SMS Token</p>
-            <p class="text-slate-500 text-xs">Paste token from your provider</p>
-          </div>
+          <div><p class="font-bold text-lg">Sync SMS Token</p><p class="text-slate-500 text-xs">Paste token from your provider</p></div>
           <div class="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
           </div>
@@ -81,55 +75,33 @@ export const renderProfile = async () => {
           : ""
       }
 
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        
-        <!-- Meter Management -->
-        <div class="space-y-6">
-          <div class="flex justify-between items-end px-2">
+      <!-- Meter Management Section -->
+      <div class="space-y-6">
+        <div class="flex justify-between items-center px-2">
+          <div>
             <h4 class="font-black text-slate-900 uppercase tracking-widest text-xs">Registered Meters</h4>
-            <span class="text-xs font-bold text-slate-400">${
+            <p class="text-[10px] font-bold text-slate-400">${
               meters.length
-            } Total</span>
+            } Active Devices</p>
           </div>
-          
-          <div id="meters-list" class="space-y-3">
-            ${
-              meters.length > 0
-                ? meters.map((m) => renderMeterTile(m)).join("")
-                : `
-              <div class="p-8 text-center bg-slate-50 rounded-[2rem] border-2 border-dashed border-slate-200">
-                <p class="text-slate-400 text-sm font-medium">No meters registered yet</p>
-              </div>
-            `
-            }
-          </div>
+          <!-- MODERN ADD METER BUTTON -->
+          <button id="open-add-meter" class="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm shadow-lg shadow-indigo-100 transition-all active:scale-95">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+            Add Meter
+          </button>
         </div>
-
-        <!-- Add Meter Form -->
-        <div class="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-sm self-start">
-          <h4 class="text-xl font-black text-slate-900 mb-6">Add New Meter</h4>
-          <form id="add-meter-form" class="space-y-4">
-            <div>
-              <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Meter Serial Number</label>
-              <input id="meter-id" required placeholder="e.g. 44002211" class="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-indigo-500 transition-all" />
+        
+        <div id="meters-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          ${
+            meters.length > 0
+              ? meters.map((m) => renderMeterTile(m)).join("")
+              : `
+            <div class="md:col-span-2 p-12 text-center bg-slate-50 rounded-[2.5rem] border-2 border-dashed border-slate-200">
+              <p class="text-slate-400 text-sm font-medium italic">No meters linked to this account.</p>
             </div>
-            <div>
-              <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Friendly Label</label>
-              <input id="meter-label" required placeholder="e.g. Main House" class="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-indigo-500 transition-all" />
-            </div>
-            <div>
-              <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Utility Type</label>
-              <select id="meter-type" class="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-indigo-500 transition-all">
-                <option value="electricity">Electricity</option>
-                <option value="water">Water</option>
-              </select>
-            </div>
-            <button type="submit" class="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black shadow-lg shadow-emerald-100 transition-all active:scale-95 mt-2">
-              Add Meter
-            </button>
-          </form>
+          `
+          }
         </div>
-
       </div>
 
       <div class="pt-8 border-t border-slate-100">
@@ -138,9 +110,44 @@ export const renderProfile = async () => {
         </button>
       </div>
     </div>
+
+    <!-- ADD METER MODAL -->
+    <div id="add-meter-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md hidden items-center justify-center z-50 p-4 transition-all">
+      <div class="bg-white rounded-[2.5rem] p-8 w-full max-w-md shadow-2xl animate-scale-in">
+        <div class="flex justify-between items-start mb-6">
+            <div>
+                <h3 class="text-3xl font-black text-slate-900 tracking-tight">New Meter</h3>
+                <p class="text-slate-500 text-sm font-medium">Link a utility device to your dashboard.</p>
+            </div>
+            <button id="close-meter-modal" class="text-slate-400 hover:text-slate-600 transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+        
+        <form id="add-meter-form" class="space-y-5">
+          <div>
+            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Meter Serial Number</label>
+            <input id="meter-id" required placeholder="e.g. 44002211" class="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-indigo-500 transition-all outline-none" />
+          </div>
+          <div>
+            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Friendly Label</label>
+            <input id="meter-label" required placeholder="e.g. My Apartment" class="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-indigo-500 transition-all outline-none" />
+          </div>
+          <div>
+            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Utility Type</label>
+            <select id="meter-type" class="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-indigo-500 transition-all outline-none appearance-none">
+              <option value="electricity">Electricity</option>
+              <option value="water">Water</option>
+            </select>
+          </div>
+          <button type="submit" class="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black shadow-lg shadow-indigo-100 transition-all active:scale-95 mt-2">
+            Register Meter
+          </button>
+        </form>
+      </div>
+    </div>
   `;
 
-  // --- Logic & Handlers ---
   setupProfileHandlers(renderProfile);
 };
 
@@ -201,23 +208,28 @@ function renderMeterTile(m) {
   `;
 }
 
-/**
- * Event Logic
- */
 function setupProfileHandlers(reRender) {
   const uid = getAuthUser()?.uid;
+  const modal = document.getElementById("add-meter-modal");
+
+  // Modal Toggle Logic
+  document.getElementById("open-add-meter").onclick = () => {
+    modal.classList.replace("hidden", "flex");
+  };
+  document.getElementById("close-meter-modal").onclick = () => {
+    modal.classList.replace("flex", "hidden");
+  };
+
+  // Logout Logic
   const logoutBtn = document.getElementById("logout-btn");
   if (logoutBtn) {
     logoutBtn.onclick = async () => {
-      const ok = await confirm(
-        "Are you sure you want to sign out?",
-        "Sign out"
-      );
-      if (!ok) return;
+      if (!(await confirm("Sign out of Flux?", "Logout"))) return;
       handleLogout();
     };
   }
 
+  // Add Meter Form Submission (Logic Maintained)
   const addForm = document.getElementById("add-meter-form");
   if (addForm) {
     addForm.onsubmit = async (e) => {
@@ -228,31 +240,33 @@ function setupProfileHandlers(reRender) {
         navigate("/onboarding");
         return;
       }
+
       const id = document.getElementById("meter-id").value.trim();
       const label = document.getElementById("meter-label").value.trim();
       const type = document.getElementById("meter-type").value;
 
       try {
         await addMeter(uid, { id, label, type });
-        showToast("Meter added!", "success");
-        reRender();
+        showToast("Meter successfully linked!", "success");
+        modal.classList.replace("flex", "hidden"); // Close modal on success
+        reRender(); // Refresh UI
       } catch (err) {
-        showToast("Error adding meter", "error");
+        showToast("Backend connection failed", "error");
       }
     };
   }
 
+  // Edit & Delete Handlers (Logic Maintained)
   document.querySelectorAll("[data-delete]").forEach((btn) => {
     btn.onclick = async () => {
       const id = btn.getAttribute("data-delete");
-      if (!(await confirm(`Are you sure you want to remove meter ${id}?`)))
-        return;
+      if (!(await confirm(`Remove meter ${id}?`))) return;
       try {
         await removeMeter(uid, id);
         showToast("Meter removed", "success");
         reRender();
       } catch (err) {
-        showToast("Error removing meter", "error");
+        showToast("Failed to remove", "error");
       }
     };
   });
@@ -260,18 +274,14 @@ function setupProfileHandlers(reRender) {
   document.querySelectorAll("[data-edit]").forEach((btn) => {
     btn.onclick = async () => {
       const id = btn.getAttribute("data-edit");
-      const newLabel = await prompt(
-        "Enter new friendly name:",
-        "Rename Meter",
-        "Home Meter"
-      );
+      const newLabel = await prompt("New meter name:", "Rename Device");
       if (!newLabel) return;
       try {
         await updateMeter(uid, id, { label: newLabel });
-        showToast("Meter updated", "success");
+        showToast("Label updated", "success");
         reRender();
       } catch (err) {
-        showToast("Error updating meter", "error");
+        showToast("Update failed", "error");
       }
     };
   });

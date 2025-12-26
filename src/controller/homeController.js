@@ -3,11 +3,14 @@ import { logout } from "../services/auth.service.js";
 import { navigate } from "../app/router.js";
 
 export const handleLogout = async (e) => {
-  e.preventDefault();
+  // Support being called directly (no event) or as an event handler
+  if (e && typeof e.preventDefault === "function") {
+    e.preventDefault();
+  }
 
   const result = await logout();
 
-  if (result.success) {
+  if (result && result.success) {
     navigate("/login");
   }
 };

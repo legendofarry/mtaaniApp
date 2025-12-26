@@ -206,7 +206,17 @@ function renderMeterTile(m) {
  */
 function setupProfileHandlers(reRender) {
   const uid = getAuthUser()?.uid;
-  document.getElementById("logout-btn").onclick = handleLogout;
+  const logoutBtn = document.getElementById("logout-btn");
+  if (logoutBtn) {
+    logoutBtn.onclick = async () => {
+      const ok = await confirm(
+        "Are you sure you want to sign out?",
+        "Sign out"
+      );
+      if (!ok) return;
+      handleLogout();
+    };
+  }
 
   const addForm = document.getElementById("add-meter-form");
   if (addForm) {

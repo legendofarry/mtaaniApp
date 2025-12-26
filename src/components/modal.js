@@ -6,17 +6,31 @@ export const confirm = (message, title = "Confirm") => {
 
     const box = document.createElement("div");
     box.className = "modal-box";
+    box.innerHTML = `
+      <div style="font-weight:700;margin-bottom:8px">${title}</div>
+      <div style="color:#374151;margin-bottom:12px">${message}</div>
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button id="modal-no" class="btn btn-ghost" style="padding:8px 12px;border:1px solid #e5e7eb;background:#fff">Maybe Not</button>
+        <button id="modal-yes" class="btn btn-primary" style="padding:8px 12px">Yes</button>
+      </div>
+    `;
+
+    overlay.appendChild(box);
     document.body.appendChild(overlay);
 
-    document.getElementById("modal-no").onclick = () => {
-      overlay.remove();
-      resolve(false);
-    };
+    const noBtn = document.getElementById("modal-no");
+    const yesBtn = document.getElementById("modal-yes");
 
-    document.getElementById("modal-yes").onclick = () => {
-      overlay.remove();
-      resolve(true);
-    };
+    if (noBtn)
+      noBtn.onclick = () => {
+        overlay.remove();
+        resolve(false);
+      };
+    if (yesBtn)
+      yesBtn.onclick = () => {
+        overlay.remove();
+        resolve(true);
+      };
   });
 };
 

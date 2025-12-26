@@ -19,6 +19,8 @@ const getStatusStyles = (s) => {
     OFF: "bg-rose-50 text-rose-700 border-rose-100 ring-rose-500",
     "LOW PRESSURE":
       "bg-amber-50 text-amber-700 border-amber-100 ring-amber-500",
+    LOW: "bg-amber-50 text-amber-700 border-amber-100 ring-amber-500",
+    DIRTY: "bg-orange-50 text-orange-700 border-orange-100 ring-orange-500",
     DEFAULT: "bg-slate-50 text-slate-700 border-slate-100 ring-slate-500",
   };
   return styles[s] || styles.DEFAULT;
@@ -46,19 +48,37 @@ export const renderWater = async () => {
   const content = document.getElementById("content");
 
   // Fetch Data
-  const [userData, status, vendors, pattern] = await Promise.all([
+  const [userData, statusData, vendors, pattern] = await Promise.all([
     getCurrentUserData(),
     getCommunityStatus(),
     getVendors(),
     getSupplyPatternSeries(14),
   ]);
 
-  const statusClasses = getStatusStyles(status.status);
+  const user = userData.success ? userData.data : null;
+  const userLocation = user?.location || {};
 
-  // Mock Alerts for the new section
+  // Extract neighbor count (only those who reported SAME status)
+  const neighborCount = statusData.count || 0;
+  const totalReports = statusData.totalReports || 0;
+  const currentStatus = statusData.status || "UNKNOWN";
+
+  const statusClasses = getStatusStyles(currentStatus);
+
+  // Build location display string
+  const locationParts = [
+    userLocation.area,
+    userLocation.estate,
+    userLocation.zone,
+    userLocation.court,
+  ].filter(Boolean);
+  const locationDisplay =
+    locationParts.length > 0 ? locationParts.join(", ") : "Your Area";
+
+  // Mock Alerts for the new section (could be dynamic later)
   const waterAlerts = [
     { type: "ON", msg: "Water ON in your area", time: "Just now" },
-    { type: "OFF", msg: "Water OFF reported by many users", time: "2h ago" },
+    { type: "OFF", msg: "Water OFF reported nearby", time: "2h ago" },
   ];
 
   content.innerHTML = `
@@ -69,6 +89,11 @@ export const renderWater = async () => {
         <div>
           <h2 class="text-4xl font-black text-slate-900 tracking-tight">Water Central</h2>
           <p class="text-slate-500 font-medium">Real-time community supply monitoring</p>
+          ${
+            locationDisplay !== "Your Area"
+              ? `<p class="text-xs font-bold text-indigo-600 uppercase tracking-widest mt-1">📍 ${locationDisplay}</p>`
+              : ""
+          }
         </div>
         <button id="fab-report" class="flex items-center justify-center gap-2 py-4 px-8 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold shadow-xl shadow-indigo-100 transition-all active:scale-95 group">
           <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 group-hover:rotate-90 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -96,12 +121,17 @@ export const renderWater = async () => {
               
               <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
-                  <h3 class="text-6xl font-black tracking-tighter">${
-                    status.status
-                  }</h3>
-                  <p class="text-lg font-medium mt-2 opacity-80">${
-                    status.count
-                  } neighbors verified this status</p>
+                  <h3 class="text-6xl font-black tracking-tighter">${currentStatus}</h3>
+                  <p class="text-lg font-medium mt-2 opacity-80">
+                    ${neighborCount} ${
+    neighborCount === 1 ? "neighbor" : "neighbors"
+  } verified this status
+                  </p>
+                  ${
+                    totalReports > neighborCount
+                      ? `<p class="text-sm font-medium mt-1 opacity-60">${totalReports} total reports in your area</p>`
+                      : ""
+                  }
                 </div>
                 <div class="bg-white/30 backdrop-blur-md rounded-2xl px-4 py-2 border border-white/40">
                     <span class="text-[10px] font-bold uppercase block opacity-60 italic text-right">Last Report</span>
@@ -117,10 +147,73 @@ export const renderWater = async () => {
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
                   </svg>
                   <p class="text-xs font-black tracking-widest uppercase text-slate-500 relative z-10">Area Hotspots Map</p>
-                  <div class="absolute top-1/4 left-1/3 w-4 h-4 bg-emerald-500 rounded-full blur-[2px] animate-pulse"></div>
-                  <div class="absolute bottom-1/3 right-1/4 w-4 h-4 bg-indigo-500 rounded-full blur-[2px] animate-bounce"></div>
+                  <p class="text-[10px] font-medium text-slate-400 mt-2 relative z-10">${locationDisplay}</p>
+                  
+                  <!-- Dynamic status indicators based on neighborCount -->
+                  ${
+                    neighborCount >= 5
+                      ? `
+                    <div class="absolute top-1/4 left-1/3 w-4 h-4 ${
+                      currentStatus === "ON"
+                        ? "bg-emerald-500"
+                        : currentStatus === "OFF"
+                        ? "bg-rose-500"
+                        : "bg-amber-500"
+                    } rounded-full blur-[2px] animate-pulse"></div>
+                    <div class="absolute bottom-1/3 right-1/4 w-4 h-4 ${
+                      currentStatus === "ON"
+                        ? "bg-emerald-500"
+                        : currentStatus === "OFF"
+                        ? "bg-rose-500"
+                        : "bg-amber-500"
+                    } rounded-full blur-[2px] animate-bounce"></div>
+                    <div class="absolute top-1/2 left-1/2 w-3 h-3 ${
+                      currentStatus === "ON"
+                        ? "bg-emerald-500"
+                        : currentStatus === "OFF"
+                        ? "bg-rose-500"
+                        : "bg-amber-500"
+                    } rounded-full blur-[2px] animate-pulse"></div>
+                  `
+                      : neighborCount >= 2
+                      ? `
+                    <div class="absolute top-1/3 left-1/2 w-4 h-4 ${
+                      currentStatus === "ON"
+                        ? "bg-emerald-500"
+                        : currentStatus === "OFF"
+                        ? "bg-rose-500"
+                        : "bg-amber-500"
+                    } rounded-full blur-[2px] animate-pulse"></div>
+                  `
+                      : ""
+                  }
                 </div>
               </div>
+              
+              <!-- Status Breakdown (if multiple statuses exist) -->
+              ${
+                statusData.breakdown &&
+                Object.keys(statusData.breakdown).length > 1
+                  ? `
+                <div class="mt-6 bg-white/40 backdrop-blur-sm rounded-2xl p-4 border border-white/50">
+                  <p class="text-xs font-black uppercase tracking-widest opacity-70 mb-3">Other Reports</p>
+                  <div class="grid grid-cols-2 gap-3">
+                    ${Object.entries(statusData.breakdown)
+                      .filter(([status]) => status !== currentStatus)
+                      .map(
+                        ([status, count]) => `
+                        <div class="flex items-center justify-between text-sm">
+                          <span class="font-medium">${status}</span>
+                          <span class="font-bold">${count}</span>
+                        </div>
+                      `
+                      )
+                      .join("")}
+                  </div>
+                </div>
+              `
+                  : ""
+              }
             </div>
           </div>
         </div>
@@ -155,7 +248,7 @@ export const renderWater = async () => {
           </div>
 
           <!-- 2. LOCAL VENDORS (Home Highlight Style) -->
-          <div class="bg-indigo-600 rounded-[2.5rem] p-6 text-white shadow-xl relative overflow-hidden flex flex-col h-[500px]">
+          <div class="bg-indigo-600 rounded-[2.5rem] p-6 text-white shadow-xl relative overflow-hidden flex flex-col h-fit !mb-[30px]">
              <div class="absolute top-0 right-0 p-4 opacity-10">
                 <svg class="w-20 h-20" fill="currentColor" viewBox="0 0 20 20"><path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3zM16 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM6.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" /></svg>
              </div>

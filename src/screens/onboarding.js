@@ -1,3 +1,4 @@
+// src\screens\onboarding.js
 import { getAuthUser } from "../services/auth.store.js";
 import { updateUserProfile, getUserData } from "../services/user.service.js";
 import { showToast } from "../components/toast.js";

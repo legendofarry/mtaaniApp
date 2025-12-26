@@ -17,8 +17,27 @@
 <body>
     <!-- Loading Screen -->
     <div id="loading-screen" class="loading-screen">
-        <div class="spinner"></div>
-        <p>Loading Flux...</p>
+        <!-- Background Decoration -->
+        <div class="loader-bg-glow"></div>
+
+        <div class="loader-content">
+            <!-- Branded Icon -->
+            <div class="loader-logo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <path d="M13 10V3L4 14h7v7l9-11h-7z" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+            </div>
+
+            <div class="loader-text-area">
+                <h1 class="loader-title">FLUX</h1>
+                <p class="loader-subtitle">Syncing community data...</p>
+            </div>
+
+            <!-- Modern Progress Bar -->
+            <div class="loader-progress-container">
+                <div class="loader-progress-bar"></div>
+            </div>
+        </div>
     </div>
 
     <!-- Main App Container -->

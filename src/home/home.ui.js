@@ -111,7 +111,7 @@ export const renderHome = async () => {
       </div>
 
       <!-- Usage Graph Card -->
-      <div class="bg-white rounded-[2rem] p-8 shadow-sm border border-slate-100">
+      <div class="bg-white rounded-[2rem] p-8 !mb-[30px] shadow-sm border border-slate-100">
         <div class="flex justify-between items-center mb-8">
           <div>
             <h3 class="text-xl font-bold text-slate-900">Usage Trend</h3>

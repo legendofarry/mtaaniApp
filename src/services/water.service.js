@@ -2,6 +2,7 @@
 // Lightweight client-side service for water reports, vendors and simple predictions
 
 import { getFirestore, collection, getDocs } from "firebase/firestore";
+import { geohashForLocation } from "geofire-common";
 
 const db = getFirestore();
 
@@ -9,11 +10,24 @@ const STORAGE_KEY = "water_reports_v1";
 
 const nowIso = () => new Date().toISOString();
 
+// Normalize status to handle variations
+const normalizeStatus = (status) => {
+  if (!status) return "ON";
+  const s = status.toString().toUpperCase().trim();
+
+  // Normalize variations
+  if (s === "LOW" || s === "LOW PRESSURE") return "LOW PRESSURE";
+  if (s === "DIRTY" || s === "DIRTY WATER") return "DIRTY WATER";
+
+  return s; // ON, OFF, or other
+};
+
 export const getSavedReports = async () => {
   try {
     const colRef = collection(db, "waterReports");
     const snapshot = await getDocs(colRef);
     const anga = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    console.log(anga);
     return anga;
   } catch (e) {
     console.warn("Failed reading reports from Firestore", e);
@@ -53,14 +67,22 @@ export const submitReport = async (report) => {
 
     console.log("User location for report:", loc);
 
+    // Calculate geohash and areaId
+    const lat = Number(loc.lat);
+    const lng = Number(loc.lng);
+    const geohash = geohashForLocation([lat, lng]);
+    const areaId = geohash.substring(0, 4);
+    const clientReportId = crypto.randomUUID();
+
     const payload = {
+      clientReportId,
       resource: "water",
-      status: r.type,
+      status: normalizeStatus(r.type), // ← NORMALIZE STATUS HERE
       userId: user.uid,
       reporterName: user.name || user.displayName || null,
       location: {
-        latitude: Number(loc.lat),
-        longitude: Number(loc.lng),
+        latitude: lat,
+        longitude: lng,
         county: user.location.county || null,
         area: user.location.area || null,
         estate: user.location.estate || null,
@@ -68,6 +90,10 @@ export const submitReport = async (report) => {
         court: user.location.court || null,
         plot: user.location.plot || null,
       },
+      lat,
+      lng,
+      geohash,
+      areaId,
       meta: { notes: r.notes || null },
     };
 
@@ -88,8 +114,7 @@ export const submitReport = async (report) => {
     };
   } catch (e) {
     console.warn("submitReport sync failed", e.message || e);
-    trySync(); // fire-and-forget
-    return { success: false, message: e.message || String(e) };
+    return { success: false, message: "Saved locally, will sync later" };
   }
 };
 
@@ -120,14 +145,20 @@ export const trySync = async () => {
 
     for (const r of unsynced) {
       try {
+        // Calculate geohash and areaId
+        const lat = Number(loc.lat);
+        const lng = Number(loc.lng);
+        const geohash = geohashForLocation([lat, lng]);
+        const areaId = geohash.substring(0, 4);
+
         const payload = {
           resource: "water",
-          status: r.type,
+          status: normalizeStatus(r.type), // ← NORMALIZE STATUS HERE TOO
           userId: user.uid,
           reporterName: user.name || user.displayName || null,
           location: {
-            latitude: Number(loc.lat),
-            longitude: Number(loc.lng),
+            latitude: lat,
+            longitude: lng,
             county: user.location.county || null,
             area: user.location.area || null,
             estate: user.location.estate || null,
@@ -135,6 +166,10 @@ export const trySync = async () => {
             court: user.location.court || null,
             plot: user.location.plot || null,
           },
+          lat,
+          lng,
+          geohash,
+          areaId,
           meta: { notes: r.notes || null },
         };
 
@@ -182,10 +217,19 @@ export const getCommunityStatus = async (radiusKm = 5) => {
     const user = userRes.success ? userRes.data : null;
     if (!user || !user.location?.geo) throw new Error("No user location");
 
+    // Calculate user's areaId from their coordinates
+    const userLat = user.location.geo.lat;
+    const userLng = user.location.geo.lng;
+    const userGeohash = geohashForLocation([userLat, userLng]);
+    const userAreaId = userGeohash.substring(0, 4);
+
     // Build complete location object for filtering
     const userLocation = {
-      latitude: user.location.geo.lat,
-      longitude: user.location.geo.lng,
+      lat: userLat,
+      lng: userLng,
+      latitude: userLat,
+      longitude: userLng,
+      areaId: userAreaId,
       county: user.location.county || null,
       area: user.location.area || null,
       estate: user.location.estate || null,
@@ -202,7 +246,7 @@ export const getCommunityStatus = async (radiusKm = 5) => {
 
     if (agg && agg.finalized !== null) {
       return {
-        status: agg.finalized,
+        status: normalizeStatus(agg.finalized), // ← NORMALIZE STATUS WHEN RETURNING
         count: agg.neighborsWithSameStatus, // Only neighbors with SAME status
         totalReports: agg.total,
         breakdown: agg.counts,
@@ -223,6 +267,19 @@ export const getCommunityStatus = async (radiusKm = 5) => {
   const user = userRes.success ? userRes.data : null;
   const userLoc = user?.location;
 
+  if (!userLoc || !userLoc.geo) {
+    return {
+      status: "ON",
+      count: 0,
+      totalReports: 0,
+      breakdown: {},
+    };
+  }
+
+  // Calculate user's areaId
+  const userGeohash = geohashForLocation([userLoc.geo.lat, userLoc.geo.lng]);
+  const userAreaId = userGeohash.substring(0, 4);
+
   const nearbyRecent = reports.filter((r) => {
     // Convert Firestore timestamp to Date
     const createdAt = r.createdAt?.toDate
@@ -231,10 +288,15 @@ export const getCommunityStatus = async (radiusKm = 5) => {
     const ageHours = (now - createdAt.getTime()) / (1000 * 60 * 60);
     if (ageHours > 24) return false; // 24 hours window
 
-    if (!userLoc || !r.location) return false;
+    if (!r.areaId && !r.location) return false;
 
-    // Match by area first (strongest indicator)
-    if (userLoc.area && r.location.area) {
+    // PRIMARY: Match by areaId
+    if (r.areaId && userAreaId && r.areaId === userAreaId) {
+      return true;
+    }
+
+    // SECONDARY: Match by area first (strongest indicator)
+    if (userLoc.area && r.location?.area) {
       if (userLoc.area === r.location.area) {
         // Further filter by estate if available
         if (userLoc.estate && r.location.estate) {
@@ -245,11 +307,14 @@ export const getCommunityStatus = async (radiusKm = 5) => {
       return false;
     }
 
-    // Fallback to geo distance if area not available
-    if (userLoc.geo && r.location.latitude && r.location.longitude) {
+    // FALLBACK: Fallback to geo distance
+    const reportLat = r.lat || r.location?.latitude;
+    const reportLng = r.lng || r.location?.longitude;
+
+    if (userLoc.geo && reportLat && reportLng) {
       const dist = getDistanceKm(userLoc.geo, {
-        lat: Number(r.location.latitude),
-        lng: Number(r.location.longitude),
+        lat: Number(reportLat),
+        lng: Number(reportLng),
       });
       return dist <= radiusKm;
     }
@@ -257,10 +322,11 @@ export const getCommunityStatus = async (radiusKm = 5) => {
     return false;
   });
 
-  // Count by status
+  // Count by status (normalize each status)
   const statusCounts = {};
   nearbyRecent.forEach((r) => {
-    statusCounts[r.status] = (statusCounts[r.status] || 0) + 1;
+    const normalized = normalizeStatus(r.status);
+    statusCounts[normalized] = (statusCounts[normalized] || 0) + 1;
   });
 
   // Determine finalized status (5+ auto-wins)
@@ -280,7 +346,7 @@ export const getCommunityStatus = async (radiusKm = 5) => {
   const neighborsWithSameStatus = statusCounts[finalizedStatus] || 0;
 
   return {
-    status: finalizedStatus,
+    status: normalizeStatus(finalizedStatus),
     count: neighborsWithSameStatus,
     totalReports: nearbyRecent.length,
     breakdown: statusCounts,

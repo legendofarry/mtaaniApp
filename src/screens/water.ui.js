@@ -11,23 +11,52 @@ import { showToast } from "../components/toast.js";
 import { navigate } from "../app/router.js";
 
 /**
+ * Normalize status to handle variations
+ */
+const normalizeStatus = (status) => {
+  if (!status) return "ON";
+  const s = status.toString().toUpperCase().trim();
+
+  // Normalize variations
+  if (s === "LOW" || s === "LOW PRESSURE") return "LOW PRESSURE";
+  if (s === "DIRTY" || s === "DIRTY WATER") return "DIRTY WATER";
+
+  return s; // ON, OFF, or other
+};
+
+/**
+ * Get color classes for status display
+ */
+const getStatusColor = (status) => {
+  const normalized = normalizeStatus(status);
+  const colors = {
+    ON: "bg-emerald-500",
+    OFF: "bg-rose-500",
+    "LOW PRESSURE": "bg-slate-500",
+    "DIRTY WATER": "bg-amber-600",
+    DEFAULT: "bg-slate-400",
+  };
+  return colors[normalized] || colors.DEFAULT;
+};
+
+/**
  * Modern Style Helpers
  */
-const getStatusStyles = (s) => {
+const getStatusStyles = (status) => {
+  const normalized = normalizeStatus(status);
   const styles = {
     ON: "bg-emerald-50 text-emerald-700 border-emerald-100 ring-emerald-500",
     OFF: "bg-rose-50 text-rose-700 border-rose-100 ring-rose-500",
     "LOW PRESSURE":
-      "bg-amber-50 text-amber-700 border-amber-100 ring-amber-500",
-    LOW: "bg-amber-50 text-amber-700 border-amber-100 ring-amber-500",
-    DIRTY: "bg-orange-50 text-orange-700 border-orange-100 ring-orange-500",
+      "bg-slate-50 text-slate-700 border-slate-100 ring-slate-500",
+    "DIRTY WATER": "bg-amber-50 text-amber-700 border-amber-100 ring-amber-500",
     DEFAULT: "bg-slate-50 text-slate-700 border-slate-100 ring-slate-500",
   };
-  return styles[s] || styles.DEFAULT;
+  return styles[normalized] || styles.DEFAULT;
 };
 
 /**
- * Sub-component: Premium Vendor Card (Matching Home UI Style)
+ * Sub-component: Premium Vendor Card
  */
 const renderVendorCard = (v) => `
   <div class="bg-white/10 backdrop-blur-md rounded-2xl p-4 flex justify-between items-center border border-white/10 group hover:bg-white/20 transition-all cursor-pointer" data-vendor-id="${v.id}">
@@ -58,12 +87,13 @@ export const renderWater = async () => {
   const user = userData.success ? userData.data : null;
   const userLocation = user?.location || {};
 
-  // Extract neighbor count (only those who reported SAME status)
+  // Extract neighbor count
   const neighborCount = statusData.count || 0;
   const totalReports = statusData.totalReports || 0;
   const currentStatus = statusData.status || "UNKNOWN";
 
   const statusClasses = getStatusStyles(currentStatus);
+  const statusColor = getStatusColor(currentStatus);
 
   // Build location display string
   const locationParts = [
@@ -75,14 +105,8 @@ export const renderWater = async () => {
   const locationDisplay =
     locationParts.length > 0 ? locationParts.join(", ") : "Your Area";
 
-  // Mock Alerts for the new section (could be dynamic later)
-  const waterAlerts = [
-    { type: "ON", msg: "Water ON in your area", time: "Just now" },
-    { type: "OFF", msg: "Water OFF reported nearby", time: "2h ago" },
-  ];
-
   content.innerHTML = `
-    <div class="max-w-6xl mx-auto p-4 md:p-8 space-y-8 animate-in fade-in">
+    <div class="max-w-6xl mx-auto p-4 md:p-8 space-y-8 animate-in fade-in pb-24">
       
       <!-- Top Action Bar -->
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -149,48 +173,22 @@ export const renderWater = async () => {
                   <p class="text-xs font-black tracking-widest uppercase text-slate-500 relative z-10">Area Hotspots Map</p>
                   <p class="text-[10px] font-medium text-slate-400 mt-2 relative z-10">${locationDisplay}</p>
                   
-                  <!-- Dynamic status indicators based on neighborCount -->
                   ${
                     neighborCount >= 5
                       ? `
-                    <div class="absolute top-1/4 left-1/3 w-4 h-4 ${
-                      currentStatus === "ON"
-                        ? "bg-emerald-500"
-                        : currentStatus === "OFF"
-                        ? "bg-rose-500"
-                        : "bg-amber-500"
-                    } rounded-full blur-[2px] animate-pulse"></div>
-                    <div class="absolute bottom-1/3 right-1/4 w-4 h-4 ${
-                      currentStatus === "ON"
-                        ? "bg-emerald-500"
-                        : currentStatus === "OFF"
-                        ? "bg-rose-500"
-                        : "bg-amber-500"
-                    } rounded-full blur-[2px] animate-bounce"></div>
-                    <div class="absolute top-1/2 left-1/2 w-3 h-3 ${
-                      currentStatus === "ON"
-                        ? "bg-emerald-500"
-                        : currentStatus === "OFF"
-                        ? "bg-rose-500"
-                        : "bg-amber-500"
-                    } rounded-full blur-[2px] animate-pulse"></div>
+                    <div class="absolute top-1/4 left-1/3 w-4 h-4 ${statusColor} rounded-full blur-[2px] animate-pulse"></div>
+                    <div class="absolute bottom-1/3 right-1/4 w-4 h-4 ${statusColor} rounded-full blur-[2px] animate-bounce"></div>
+                    <div class="absolute top-1/2 left-1/2 w-3 h-3 ${statusColor} rounded-full blur-[2px] animate-pulse"></div>
                   `
                       : neighborCount >= 2
                       ? `
-                    <div class="absolute top-1/3 left-1/2 w-4 h-4 ${
-                      currentStatus === "ON"
-                        ? "bg-emerald-500"
-                        : currentStatus === "OFF"
-                        ? "bg-rose-500"
-                        : "bg-amber-500"
-                    } rounded-full blur-[2px] animate-pulse"></div>
+                    <div class="absolute top-1/3 left-1/2 w-4 h-4 ${statusColor} rounded-full blur-[2px] animate-pulse"></div>
                   `
                       : ""
                   }
                 </div>
               </div>
               
-              <!-- Status Breakdown (if multiple statuses exist) -->
               ${
                 statusData.breakdown &&
                 Object.keys(statusData.breakdown).length > 1
@@ -199,11 +197,17 @@ export const renderWater = async () => {
                   <p class="text-xs font-black uppercase tracking-widest opacity-70 mb-3">Other Reports</p>
                   <div class="grid grid-cols-2 gap-3">
                     ${Object.entries(statusData.breakdown)
-                      .filter(([status]) => status !== currentStatus)
+                      .filter(
+                        ([status]) =>
+                          normalizeStatus(status) !==
+                          normalizeStatus(currentStatus)
+                      )
                       .map(
                         ([status, count]) => `
                         <div class="flex items-center justify-between text-sm">
-                          <span class="font-medium">${status}</span>
+                          <span class="font-medium">${normalizeStatus(
+                            status
+                          )}</span>
                           <span class="font-bold">${count}</span>
                         </div>
                       `
@@ -218,37 +222,9 @@ export const renderWater = async () => {
           </div>
         </div>
 
-        <!-- SIDEBAR: Alerts & Vendors -->
+        <!-- SIDEBAR: Vendors -->
         <div class="lg:col-span-4 space-y-6">
-          
-          <!-- 1. SIMPLE WATER ALERTS (New Section) -->
-          <div class="bg-white rounded-[2.5rem] p-6 border border-slate-100 shadow-sm flex flex-col">
-            <h4 class="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Supply Alerts</h4>
-            <div class="space-y-4">
-              ${waterAlerts
-                .map(
-                  (alert) => `
-                <div class="flex items-start gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-100">
-                  <div class="mt-1 w-2 h-2 rounded-full ${
-                    alert.type === "ON" ? "bg-emerald-500" : "bg-rose-500"
-                  }"></div>
-                  <div class="flex-1">
-                    <p class="text-sm font-bold text-slate-800 leading-tight">${
-                      alert.msg
-                    }</p>
-                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">${
-                      alert.time
-                    }</span>
-                  </div>
-                </div>
-              `
-                )
-                .join("")}
-            </div>
-          </div>
-
-          <!-- 2. LOCAL VENDORS (Home Highlight Style) -->
-          <div class="bg-indigo-600 rounded-[2.5rem] p-6 text-white shadow-xl relative overflow-hidden flex flex-col h-fit !mb-[30px]">
+          <div class="bg-indigo-600 rounded-[2.5rem] p-6 text-white shadow-xl relative overflow-hidden flex flex-col h-fit">
              <div class="absolute top-0 right-0 p-4 opacity-10">
                 <svg class="w-20 h-20" fill="currentColor" viewBox="0 0 20 20"><path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3zM16 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM6.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" /></svg>
              </div>
@@ -258,7 +234,7 @@ export const renderWater = async () => {
                <p class="text-xs text-indigo-200 font-medium">Top verified delivery partners</p>
              </div>
 
-             <div id="vendors-list" class="space-y-3 overflow-y-auto pr-2 custom-scrollbar">
+             <div id="vendors-list" class="space-y-3 overflow-y-auto pr-2">
                 ${vendors.map((v) => renderVendorCard(v)).join("")}
              </div>
 
@@ -272,46 +248,46 @@ export const renderWater = async () => {
       </div>
     </div>
 
-    <!-- MODALS (Keeping original logic) -->
-    <div id="report-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md hidden items-center justify-center z-50 p-4 transition-all">
+    <!-- REPORT MODAL -->
+    <div id="report-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md hidden items-center justify-center z-50 p-4">
       <div class="bg-white rounded-[2.5rem] p-8 w-full max-w-md shadow-2xl animate-scale-in">
-        <div class="flex justify-between items-start mb-6 text-slate-900">
+        <div class="flex justify-between items-start mb-6">
             <div>
-                <h3 class="text-3xl font-black tracking-tight">Report Status</h3>
-                <p class="text-slate-500 text-sm font-medium">Your data helps the whole neighborhood.</p>
+                <h3 class="text-3xl font-black text-slate-900 tracking-tight">Report Status</h3>
+                <p class="text-slate-500 text-sm font-medium">Help your community stay informed</p>
             </div>
-            <button id="report-close-x" class="text-slate-400">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"></path></svg>
+            <button id="report-close-x" class="text-slate-400 hover:text-slate-600">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
         </div>
         <form id="report-form" class="space-y-6">
           <div class="grid grid-cols-2 gap-3">
-              <button type="button" class="report-opt-btn p-3 rounded-2xl border-2 border-slate-100 font-bold text-sm" data-value="ON">Water ON</button>
-              <button type="button" class="report-opt-btn p-3 rounded-2xl border-2 border-slate-100 font-bold text-sm" data-value="OFF">Water OFF</button>
-              <button type="button" class="report-opt-btn p-3 rounded-2xl border-2 border-slate-100 font-bold text-sm" data-value="LOW">Low Pressure</button>
-              <button type="button" class="report-opt-btn p-3 rounded-2xl border-2 border-slate-100 font-bold text-sm" data-value="DIRTY">Dirty Water</button>
+              <button type="button" class="report-opt-btn p-3 rounded-2xl border-2 border-slate-100 hover:border-emerald-500 hover:bg-emerald-50 font-bold text-sm transition-all" data-value="ON">💧 Water ON</button>
+              <button type="button" class="report-opt-btn p-3 rounded-2xl border-2 border-slate-100 hover:border-rose-500 hover:bg-rose-50 font-bold text-sm transition-all" data-value="OFF">⛔ Water OFF</button>
+              <button type="button" class="report-opt-btn p-3 rounded-2xl border-2 border-slate-100 hover:border-slate-500 hover:bg-slate-50 font-bold text-sm transition-all" data-value="LOW PRESSURE">📉 Low Pressure</button>
+              <button type="button" class="report-opt-btn p-3 rounded-2xl border-2 border-slate-100 hover:border-amber-500 hover:bg-amber-50 font-bold text-sm transition-all" data-value="DIRTY WATER">🟤 Dirty Water</button>
           </div>
           <input type="hidden" id="report-type" value="ON">
-          <textarea id="report-notes" placeholder="Notes (optional)" class="w-full bg-slate-50 rounded-2xl p-4 text-sm outline-none" rows="3"></textarea>
+          <textarea id="report-notes" placeholder="Add any additional notes (optional)" class="w-full bg-slate-50 rounded-2xl p-4 text-sm outline-none border-2 border-transparent focus:border-indigo-500" rows="3"></textarea>
           <div class="flex gap-4">
-            <button type="button" id="report-cancel" class="flex-1 py-4 font-bold text-slate-400">Cancel</button>
-            <button type="submit" class="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-bold shadow-lg shadow-indigo-100">Post Report</button>
+            <button type="button" id="report-cancel" class="flex-1 py-4 font-bold text-slate-400 hover:text-slate-600">Cancel</button>
+            <button type="submit" id="report-submit" class="flex-1 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold shadow-lg shadow-indigo-100 transition-all active:scale-95">Submit Report</button>
           </div>
         </form>
       </div>
     </div>
 
-    <div id="vendor-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md hidden items-center justify-center z-50 p-4 transition-all">
+    <!-- VENDOR MODAL -->
+    <div id="vendor-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md hidden items-center justify-center z-50 p-4">
       <div class="bg-white rounded-[2.5rem] p-8 w-full max-w-sm shadow-2xl animate-scale-in" id="vendor-modal-content"></div>
     </div>
   `;
 
   setupEventListeners(vendors);
-  trySync();
 };
 
 /**
- * Event Logic (Unchanged from original structure)
+ * Event Logic
  */
 const setupEventListeners = (vendors) => {
   const reportModal = document.getElementById("report-modal");
@@ -346,27 +322,52 @@ const setupEventListeners = (vendors) => {
 
   document.getElementById("report-form").onsubmit = async (e) => {
     e.preventDefault();
-    const res = await submitReport({
-      type: reportTypeInput.value,
-      notes: document.getElementById("report-notes").value.trim(),
-    });
 
-    if (res && res.success) {
-      showToast("Community updated!", "success");
-      reportModal.classList.replace("flex", "hidden");
-      renderWater();
-    } else {
-      // if failed to sync, notify user and keep modal open or close based on preference
-      showToast(
-        res?.message || "Report saved locally (will sync when online)",
-        "warning"
-      );
-      reportModal.classList.replace("flex", "hidden");
-      renderWater();
+    const submitBtn = document.getElementById("report-submit");
+    const originalText = submitBtn.textContent;
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="animate-pulse">Submitting...</span>';
+
+    try {
+      const res = await submitReport({
+        type: reportTypeInput.value,
+        notes: document.getElementById("report-notes").value.trim(),
+      });
+
+      if (res && res.success) {
+        showToast("✅ Report submitted successfully!", "success");
+        reportModal.classList.replace("flex", "hidden");
+
+        document.getElementById("report-notes").value = "";
+        document
+          .querySelectorAll(".report-opt-btn")
+          .forEach((b) =>
+            b.classList.remove(
+              "border-indigo-600",
+              "bg-indigo-50",
+              "text-indigo-600"
+            )
+          );
+
+        setTimeout(() => renderWater(), 500);
+      } else {
+        showToast(
+          res?.message || "⚠️ Saved locally, will sync when online",
+          "warning"
+        );
+        reportModal.classList.replace("flex", "hidden");
+        setTimeout(() => renderWater(), 500);
+      }
+    } catch (error) {
+      console.error("Submit error:", error);
+      showToast("❌ Failed to submit. Please try again.", "error");
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = originalText;
     }
   };
 
-  // Vendor Details
   document.querySelectorAll("[data-vendor-id]").forEach((btn) => {
     btn.onclick = () => {
       const v = vendors.find(
@@ -381,8 +382,8 @@ const setupEventListeners = (vendors) => {
                 <div class="p-4 bg-slate-50 rounded-2xl"><p class="text-[10px] font-black text-slate-400 uppercase">Price</p><p class="font-bold">Ksh ${v.price}</p></div>
                 <div class="p-4 bg-slate-50 rounded-2xl"><p class="text-[10px] font-black text-slate-400 uppercase">Status</p><p class="font-bold text-emerald-500">Active</p></div>
             </div>
-            <a href="tel:${v.contact}" class="block w-full mt-8 py-5 bg-emerald-500 text-white rounded-[1.5rem] font-bold shadow-xl">Call Vendor</a>
-            <button id="vendor-close" class="mt-6 text-sm font-bold text-slate-400">Dismiss</button>
+            <a href="tel:${v.contact}" class="block w-full mt-8 py-5 bg-emerald-500 text-white rounded-[1.5rem] font-bold shadow-xl hover:bg-emerald-600">Call Vendor</a>
+            <button id="vendor-close" class="mt-6 text-sm font-bold text-slate-400 hover:text-slate-600">Dismiss</button>
         </div>
       `;
       vendorModal.classList.replace("hidden", "flex");

@@ -1,16 +1,23 @@
 // src/services/water.service.js
 // Lightweight client-side service for water reports, vendors and simple predictions
 
+import { getFirestore, collection, getDocs } from "firebase/firestore"; // ← make sure collection is imported
+
+const db = getFirestore();
+
 const STORAGE_KEY = "water_reports_v1";
 
 const nowIso = () => new Date().toISOString();
 
-export const getSavedReports = () => {
+export const getSavedReports = async () => {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY) || "[]";
-    return JSON.parse(raw);
+    const colRef = collection(db, "waterReports");
+    const snapshot = await getDocs(colRef);
+    const anga = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    console.log(anga);
+    return anga;
   } catch (e) {
-    console.warn("Failed reading saved reports", e);
+    console.warn("Failed reading reports from Firestore", e);
     return [];
   }
 };
@@ -20,7 +27,7 @@ export const saveReports = (reports) => {
 };
 
 export const submitReport = async (report) => {
-  const reports = getSavedReports();
+  const reports = await getSavedReports();
   const r = { ...report, createdAt: nowIso(), synced: false };
   reports.push(r);
   saveReports(reports);
@@ -44,7 +51,7 @@ export const submitReport = async (report) => {
       console.warn("Cannot submit report: missing or invalid location");
       return { success: false, message: "Valid location required" };
     }
-
+    console.log("User location for report:", loc);
     const payload = {
       resource: "water",
       status: r.type,
@@ -81,7 +88,7 @@ export const submitReport = async (report) => {
 };
 
 export const trySync = async () => {
-  const reports = getSavedReports();
+  const reports = await getSavedReports();
   const unsynced = reports.filter((r) => !r.synced);
   if (!unsynced.length) return { ok: true, synced: 0 };
 
@@ -140,22 +147,38 @@ export const trySync = async () => {
   }
 };
 
-export const getCommunityStatus = async () => {
-  // Prefer server-side aggregated status when available
+// Haversine formula to calculate distance in km
+const getDistanceKm = (loc1, loc2) => {
+  const R = 6371; // Earth's radius in km
+  const dLat = ((loc2.lat - loc1.lat) * Math.PI) / 180;
+  const dLng = ((loc2.lng - loc1.lng) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((loc1.lat * Math.PI) / 180) *
+      Math.cos((loc2.lat * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
+
+export const getCommunityStatus = async (radiusKm = 5) => {
+  // Prefer server-side aggregated status
   try {
     const { aggregateStatus } = await import("./resourceReports.service.js");
     const { getCurrentUserData } = await import("./user.service.js");
+
     const userRes = await getCurrentUserData();
     const user = userRes.success ? userRes.data : null;
-    const center = user?.location
-      ? { lat: user.location.latitude, lng: user.location.longitude }
-      : null;
+    if (!user || !user.location?.geo) throw new Error("No user location");
+
+    const center = { lat: user.location.geo.lat, lng: user.location.geo.lng };
 
     const agg = await aggregateStatus({
       resource: "water",
       center,
-      radiusKm: 5,
+      radiusKm,
     });
+
     if (agg && agg.finalized !== null) {
       return { status: agg.finalized, count: agg.total };
     }
@@ -163,20 +186,42 @@ export const getCommunityStatus = async () => {
     console.warn("aggregateStatus not available", e.message || e);
   }
 
-  // Fallback to local storage method
-  const reports = getSavedReports();
-  const recent = reports.filter((r) => {
-    const age =
-      (Date.now() - new Date(r.createdAt).getTime()) / (1000 * 60 * 60);
-    return age <= 72; // last 3 days
+  // Fallback: local Firestore data
+  const reports = await getSavedReports();
+
+  // Filter recent reports (last 3 days) and within radius
+  const now = Date.now();
+  const userRes = await import("./user.service.js").then((m) =>
+    m.getCurrentUserData()
+  );
+  const user = userRes.success ? userRes.data : null;
+  const userLoc = user?.location?.geo;
+
+  const nearbyRecent = reports.filter((r) => {
+    // Convert Firestore timestamp to Date
+    const createdAt = r.createdAt?.toDate
+      ? r.createdAt.toDate()
+      : new Date(r.createdAt);
+    const ageHours = (now - createdAt.getTime()) / (1000 * 60 * 60);
+    if (ageHours > 72) return false;
+
+    if (!userLoc || !r.location?.latitude || !r.location?.longitude)
+      return true;
+
+    const dist = getDistanceKm(userLoc, {
+      lat: Number(r.location.latitude),
+      lng: Number(r.location.longitude),
+    });
+
+    return dist <= radiusKm;
   });
 
-  let off = recent.filter((r) => r.type === "OFF").length;
-  let low = recent.filter((r) => r.type === "LOW").length;
+  const off = nearbyRecent.filter((r) => r.type === "OFF").length;
+  const low = nearbyRecent.filter((r) => r.type === "LOW").length;
 
   if (off > 6) return { status: "OFF", count: off };
   if (low > 4) return { status: "LOW PRESSURE", count: low };
-  return { status: "ON", count: recent.length };
+  return { status: "ON", count: nearbyRecent.length };
 };
 
 export const getVendors = () => {
@@ -232,17 +277,25 @@ export const predictNextSupply = () => {
   return { day, time: "6:00 AM" };
 };
 
-export const getSupplyPatternSeries = (days = 14) => {
-  const reports = getSavedReports();
+export const getSupplyPatternSeries = async (days = 14) => {
+  const reports = await getSavedReports();
   const series = [];
+
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
     const key = d.toISOString().slice(0, 10);
-    const count = reports.filter(
-      (r) => r.createdAt.slice(0, 10) === key
-    ).length;
+
+    const count = reports.filter((r) => {
+      // Convert Firestore Timestamp to Date if necessary
+      const createdAt = r.createdAt?.toDate
+        ? r.createdAt.toDate()
+        : new Date(r.createdAt);
+      return createdAt.toISOString().slice(0, 10) === key;
+    }).length;
+
     series.push(count);
   }
+
   return series;
 };

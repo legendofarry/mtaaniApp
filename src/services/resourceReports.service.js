@@ -26,6 +26,40 @@ const haversineKm = (lat1, lon1, lat2, lon2) => {
   return R * c;
 };
 
+/**
+ * Check if two locations match based on detailed location fields
+ * Priority: area > estate > zone > court
+ */
+const isMatchingLocation = (loc1, loc2, radiusKm = 5) => {
+  // If both have area and they match, that's a strong match
+  if (loc1.area && loc2.area && loc1.area === loc2.area) {
+    // Further refine by estate if available
+    if (loc1.estate && loc2.estate) {
+      return loc1.estate === loc2.estate;
+    }
+    // Or by zone
+    if (loc1.zone && loc2.zone) {
+      return loc1.zone === loc2.zone;
+    }
+    // Area match is good enough
+    return true;
+  }
+
+  // If areas don't match or aren't available, fall back to geo distance
+  if (loc1.latitude && loc1.longitude && loc2.latitude && loc2.longitude) {
+    const dist = haversineKm(
+      parseFloat(loc1.latitude),
+      parseFloat(loc1.longitude),
+      parseFloat(loc2.latitude),
+      parseFloat(loc2.longitude)
+    );
+    return dist <= radiusKm;
+  }
+
+  // If we can't determine, be conservative and don't match
+  return false;
+};
+
 export const createReport = async ({
   resource = "water", // "water" or "electricity"
   status,
@@ -65,6 +99,11 @@ export const createReport = async ({
         latitude: Number(location.latitude),
         longitude: Number(location.longitude),
         county: location.county || null,
+        area: location.area || null,
+        estate: location.estate || null,
+        zone: location.zone || null,
+        court: location.court || null,
+        plot: location.plot || null,
       },
       status,
       meta,
@@ -85,6 +124,7 @@ export const createReport = async ({
         reporterUid: userId,
         reporterName: payload.reporterName || null,
         targetCounty: location?.county || null,
+        targetArea: location?.area || null,
         resource,
         reportRef: `${col}/${docRef.id}`,
         createdAt: serverTimestamp(),
@@ -111,24 +151,35 @@ export const fetchRecentReports = async ({ resource = "water" } = {}) => {
 
 export const fetchNearbyReports = async ({
   resource = "water",
-  center = { lat: 0, lng: 0 },
+  userLocation = null,
   radiusKm = 5,
 } = {}) => {
   const recent = await fetchRecentReports({ resource });
-  if (!center || !center.lat || !center.lng) return [];
+  if (!userLocation) return [];
 
   const list = recent
-    .filter((r) => r.location && r.location.latitude && r.location.longitude)
-    .map((r) => ({
-      ...r,
-      distanceKm: haversineKm(
-        parseFloat(center.lat),
-        parseFloat(center.lng),
-        parseFloat(r.location.latitude),
-        parseFloat(r.location.longitude)
-      ),
-    }))
-    .filter((r) => r.distanceKm <= radiusKm)
+    .filter((r) => {
+      if (!r.location) return false;
+      return isMatchingLocation(userLocation, r.location, radiusKm);
+    })
+    .map((r) => {
+      // Calculate distance if both have geo coordinates
+      let distanceKm = null;
+      if (
+        userLocation.latitude &&
+        userLocation.longitude &&
+        r.location.latitude &&
+        r.location.longitude
+      ) {
+        distanceKm = haversineKm(
+          parseFloat(userLocation.latitude),
+          parseFloat(userLocation.longitude),
+          parseFloat(r.location.latitude),
+          parseFloat(r.location.longitude)
+        );
+      }
+      return { ...r, distanceKm };
+    })
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
   return list;
@@ -136,37 +187,60 @@ export const fetchNearbyReports = async ({
 
 export const aggregateStatus = async ({
   resource = "water",
-  center = { lat: 0, lng: 0 },
+  userLocation = null,
   radiusKm = 5,
 } = {}) => {
-  const list = await fetchNearbyReports({ resource, center, radiusKm });
+  const list = await fetchNearbyReports({ resource, userLocation, radiusKm });
   const counts = {};
   list.forEach((r) => (counts[r.status] = (counts[r.status] || 0) + 1));
 
   let finalized = null;
   const entries = Object.entries(counts);
   if (entries.length === 0) {
-    return { counts, finalized: null, total: 0 };
+    return {
+      counts,
+      finalized: null,
+      total: 0,
+      neighborsWithSameStatus: 0,
+      allReports: [],
+    };
   }
 
-  // find max count
-  const max = Math.max(...entries.map(([, c]) => c));
-  const tied = entries.filter(([, c]) => c === max).map(([s]) => s);
-
-  if (tied.length === 1) {
-    finalized = tied[0];
+  // AUTO STATUS CHANGE: If any status has 5+ reports, prioritize it
+  const highVolumeStatus = entries.find(([status, count]) => count >= 5);
+  if (highVolumeStatus) {
+    finalized = highVolumeStatus[0];
   } else {
-    // tie-breaker: pick status with most recent report among tied statuses
-    const latestByStatus = {};
-    for (const t of tied) {
-      const item = list.find((r) => r.status === t);
-      if (item) latestByStatus[t] = new Date(item.createdAt).getTime();
+    // find max count
+    const max = Math.max(...entries.map(([, c]) => c));
+    const tied = entries.filter(([, c]) => c === max).map(([s]) => s);
+
+    if (tied.length === 1) {
+      finalized = tied[0];
+    } else {
+      // tie-breaker: pick status with most recent report among tied statuses
+      const latestByStatus = {};
+      for (const t of tied) {
+        const item = list.find((r) => r.status === t);
+        if (item) latestByStatus[t] = new Date(item.createdAt).getTime();
+      }
+      const sorted = Object.entries(latestByStatus).sort((a, b) => b[1] - a[1]);
+      finalized = sorted[0][0];
     }
-    const sorted = Object.entries(latestByStatus).sort((a, b) => b[1] - a[1]);
-    finalized = sorted[0][0];
   }
 
-  return { counts, finalized, total: list.length };
+  // Count neighbors who reported the SAME status as finalized
+  const neighborsWithSameStatus = list.filter(
+    (r) => r.status === finalized
+  ).length;
+
+  return {
+    counts,
+    finalized,
+    total: list.length,
+    neighborsWithSameStatus,
+    allReports: list,
+  };
 };
 
 export default {

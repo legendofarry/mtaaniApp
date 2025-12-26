@@ -1,7 +1,7 @@
 // src/services/water.service.js
 // Lightweight client-side service for water reports, vendors and simple predictions
 
-import { getFirestore, collection, getDocs } from "firebase/firestore"; // ← make sure collection is imported
+import { getFirestore, collection, getDocs } from "firebase/firestore";
 
 const db = getFirestore();
 
@@ -51,7 +51,9 @@ export const submitReport = async (report) => {
       console.warn("Cannot submit report: missing or invalid location");
       return { success: false, message: "Valid location required" };
     }
+
     console.log("User location for report:", loc);
+
     const payload = {
       resource: "water",
       status: r.type,
@@ -61,6 +63,11 @@ export const submitReport = async (report) => {
         latitude: Number(loc.lat),
         longitude: Number(loc.lng),
         county: user.location.county || null,
+        area: user.location.area || null,
+        estate: user.location.estate || null,
+        zone: user.location.zone || null,
+        court: user.location.court || null,
+        plot: user.location.plot || null,
       },
       meta: { notes: r.notes || null },
     };
@@ -120,9 +127,14 @@ export const trySync = async () => {
           userId: user.uid,
           reporterName: user.name || user.displayName || null,
           location: {
-            latitude: Number(user.location.latitude),
-            longitude: Number(user.location.longitude),
+            latitude: Number(loc.lat),
+            longitude: Number(loc.lng),
             county: user.location.county || null,
+            area: user.location.area || null,
+            estate: user.location.estate || null,
+            zone: user.location.zone || null,
+            court: user.location.court || null,
+            plot: user.location.plot || null,
           },
           meta: { notes: r.notes || null },
         };
@@ -162,7 +174,7 @@ const getDistanceKm = (loc1, loc2) => {
 };
 
 export const getCommunityStatus = async (radiusKm = 5) => {
-  // Prefer server-side aggregated status
+  // Prefer server-side aggregated status with proper location filtering
   try {
     const { aggregateStatus } = await import("./resourceReports.service.js");
     const { getCurrentUserData } = await import("./user.service.js");
@@ -171,31 +183,46 @@ export const getCommunityStatus = async (radiusKm = 5) => {
     const user = userRes.success ? userRes.data : null;
     if (!user || !user.location?.geo) throw new Error("No user location");
 
-    const center = { lat: user.location.geo.lat, lng: user.location.geo.lng };
+    // Build complete location object for filtering
+    const userLocation = {
+      latitude: user.location.geo.lat,
+      longitude: user.location.geo.lng,
+      county: user.location.county || null,
+      area: user.location.area || null,
+      estate: user.location.estate || null,
+      zone: user.location.zone || null,
+      court: user.location.court || null,
+      plot: user.location.plot || null,
+    };
 
     const agg = await aggregateStatus({
       resource: "water",
-      center,
+      userLocation,
       radiusKm,
     });
 
     if (agg && agg.finalized !== null) {
-      return { status: agg.finalized, count: agg.total };
+      return {
+        status: agg.finalized,
+        count: agg.neighborsWithSameStatus, // Only neighbors with SAME status
+        totalReports: agg.total,
+        breakdown: agg.counts,
+      };
     }
   } catch (e) {
     console.warn("aggregateStatus not available", e.message || e);
   }
 
-  // Fallback: local Firestore data
+  // Fallback: local Firestore data (shouldn't happen with fixed service)
   const reports = await getSavedReports();
 
-  // Filter recent reports (last 3 days) and within radius
+  // Filter recent reports (last 24 hours) and within same area
   const now = Date.now();
   const userRes = await import("./user.service.js").then((m) =>
     m.getCurrentUserData()
   );
   const user = userRes.success ? userRes.data : null;
-  const userLoc = user?.location?.geo;
+  const userLoc = user?.location;
 
   const nearbyRecent = reports.filter((r) => {
     // Convert Firestore timestamp to Date
@@ -203,25 +230,62 @@ export const getCommunityStatus = async (radiusKm = 5) => {
       ? r.createdAt.toDate()
       : new Date(r.createdAt);
     const ageHours = (now - createdAt.getTime()) / (1000 * 60 * 60);
-    if (ageHours > 72) return false;
+    if (ageHours > 24) return false; // 24 hours window
 
-    if (!userLoc || !r.location?.latitude || !r.location?.longitude)
-      return true;
+    if (!userLoc || !r.location) return false;
 
-    const dist = getDistanceKm(userLoc, {
-      lat: Number(r.location.latitude),
-      lng: Number(r.location.longitude),
-    });
+    // Match by area first (strongest indicator)
+    if (userLoc.area && r.location.area) {
+      if (userLoc.area === r.location.area) {
+        // Further filter by estate if available
+        if (userLoc.estate && r.location.estate) {
+          return userLoc.estate === r.location.estate;
+        }
+        return true; // Same area is good enough
+      }
+      return false;
+    }
 
-    return dist <= radiusKm;
+    // Fallback to geo distance if area not available
+    if (userLoc.geo && r.location.latitude && r.location.longitude) {
+      const dist = getDistanceKm(userLoc.geo, {
+        lat: Number(r.location.latitude),
+        lng: Number(r.location.longitude),
+      });
+      return dist <= radiusKm;
+    }
+
+    return false;
   });
 
-  const off = nearbyRecent.filter((r) => r.type === "OFF").length;
-  const low = nearbyRecent.filter((r) => r.type === "LOW").length;
+  // Count by status
+  const statusCounts = {};
+  nearbyRecent.forEach((r) => {
+    statusCounts[r.status] = (statusCounts[r.status] || 0) + 1;
+  });
 
-  if (off > 6) return { status: "OFF", count: off };
-  if (low > 4) return { status: "LOW PRESSURE", count: low };
-  return { status: "ON", count: nearbyRecent.length };
+  // Determine finalized status (5+ auto-wins)
+  let finalizedStatus = "ON"; // default
+  const entries = Object.entries(statusCounts);
+
+  // Check for 5+ reports of same status
+  const highVolume = entries.find(([status, count]) => count >= 5);
+  if (highVolume) {
+    finalizedStatus = highVolume[0];
+  } else if (entries.length > 0) {
+    // Otherwise pick highest count
+    const sorted = entries.sort((a, b) => b[1] - a[1]);
+    finalizedStatus = sorted[0][0];
+  }
+
+  const neighborsWithSameStatus = statusCounts[finalizedStatus] || 0;
+
+  return {
+    status: finalizedStatus,
+    count: neighborsWithSameStatus,
+    totalReports: nearbyRecent.length,
+    breakdown: statusCounts,
+  };
 };
 
 export const getVendors = () => {
